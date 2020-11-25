@@ -50,7 +50,7 @@
 
 		qcom,msm-ext-pa = "primary";
 		qcom,msm-mclk-freq = <9600000>;
-		qcom,msm-mbhc-hphl-swh = <0>;
+		qcom,msm-mbhc-hphl-swh = <1>;
 		qcom,msm-mbhc-gnd-swh = <0>;
 		qcom,msm-hs-micbias-type = "internal";
 		qcom,msm-micbias1-ext-cap;
@@ -61,12 +61,12 @@
 				"INT_LDO_H", "MCLK",
 				"RX_I2S_CLK", "MCLK",
 				"TX_I2S_CLK", "MCLK",
-				"MIC BIAS External", "Handset Mic",
-				"MIC BIAS External2", "Headset Mic",
-				"MIC BIAS External", "Secondary Mic",
-				"AMIC1", "MIC BIAS External",
-				"AMIC2", "MIC BIAS External2",
-				"AMIC3", "MIC BIAS External",
+				"MIC BIAS Internal1", "Handset Mic",
+				"MIC BIAS Internal2", "Headset Mic",
+				"MIC BIAS Internal1", "Secondary Mic",
+				"AMIC1", "MIC BIAS Internal1",
+				"AMIC2", "MIC BIAS Internal2",
+				"AMIC3", "MIC BIAS Internal1",
 				"ADC1_IN", "ADC1_OUT",
 				"ADC2_IN", "ADC2_OUT",
 				"ADC3_IN", "ADC3_OUT",

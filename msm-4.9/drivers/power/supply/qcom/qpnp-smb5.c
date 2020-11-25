@@ -221,6 +221,10 @@ struct smb5 {
 	struct smb_dt_props	dt;
 };
 
+//#undef pr_debug
+//#define pr_debug pr_info
+
+//static int __debug_mask = 0xff;
 static int __debug_mask;
 module_param_named(
 	debug_mask, __debug_mask, int, 0600
@@ -507,6 +511,24 @@ static int smb5_parse_dt(struct smb5 *chip)
 
 	chg->fcc_stepper_enable = of_property_read_bool(node,
 					"qcom,fcc-stepping-enable");
+
+	if (of_find_property(node, "qcom,ssmux-gpio", NULL)) {
+		chg->ssmux_gpio = of_get_named_gpio_flags(node,
+				"qcom,ssmux-gpio", 0, &chg->gpio_flag);
+		if (!gpio_is_valid(chg->ssmux_gpio)) {
+			if (chg->ssmux_gpio != -EPROBE_DEFER)
+				pr_err("failed to get ss-mux config gpio=%d\n",
+						chg->ssmux_gpio);
+			//return chg->ssmux_gpio;
+		}
+
+		rc = devm_gpio_request(chg->dev, chg->ssmux_gpio,
+				"typec_mux_config_gpio");
+		if (rc) {
+			pr_err("failed to request ss-mux gpio rc=%d\n", rc);
+			//return rc;
+		}
+	}
 
 	return 0;
 }
@@ -2270,7 +2292,15 @@ static int smb5_init_hw(struct smb5 *chip)
 			return rc;
 		}
 	}
-
+	/*jeffery modify BAT_THERM PULL to 30K */
+		rc = smb5_configure_internal_pull(chg, BAT_THERM,
+				INTERNAL_PULL_30K_PULL);
+		if (rc < 0) {
+			dev_err(chg->dev,
+				"Couldn't configure CONN_THERM pull-up rc=%d\n",
+				rc);
+			return rc;
+		}
 	return rc;
 }
 
@@ -2964,7 +2994,6 @@ static int smb5_remove(struct platform_device *pdev)
 {
 	struct smb5 *chip = platform_get_drvdata(pdev);
 	struct smb_charger *chg = &chip->chg;
-
 	/* force enable APSD */
 	smblib_masked_write(chg, USBIN_OPTIONS_1_CFG_REG,
 				BC1P2_SRC_DETECT_BIT, BC1P2_SRC_DETECT_BIT);

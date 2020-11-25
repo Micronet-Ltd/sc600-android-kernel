@@ -49,3 +49,9 @@
 	qcom,chg-led-sw-controls;
 	qcom,chg-led-support;
 };
+
+&cci {
+    qcom,camera@0 {
+       qcom,led-flash-src = <&led_flash0>;
+   };
+};

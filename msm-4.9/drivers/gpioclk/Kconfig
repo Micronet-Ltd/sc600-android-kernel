@@ -1,0 +1,11 @@
+config GPIO_CLK
+    tristate "gpio clock  driver"
+    default n
+    help
+      This is the main file for gpio clock.
+
+      Say Y here if you have a gpio clock connected to your system.
+
+      If unsure, say N.
+
+      To compile this driver as a module, choose M here.

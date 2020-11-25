@@ -319,9 +319,10 @@
 			qcom,flash-disable-soc = <10>;
 			qcom,sw-jeita-enable;
 			qcom,step-charging-enable;
-			qcom,hw-die-temp-mitigation;
-			qcom,hw-connector-mitigation;
+			//qcom,hw-die-temp-mitigation;
+			//qcom,hw-connector-mitigation;
 			qcom,connector-internal-pull-kohm = <100>;
+			qcom,float-option = <1>;
 
 			qcom,thermal-mitigation
 				= <3000000 2500000 2000000 1500000
@@ -590,6 +591,14 @@
 				qcom,ramp-high-index = <19>;
 				qcom,ramp-pattern-repeat;
 				qcom,lpg-sdam-base = <0x64>;
+			};
+			lpg@4 {
+				qcom,lpg-chan-id = <4>;
+				qcom,ramp-step-ms = <200>;
+				qcom,ramp-low-index = <0>;
+				qcom,ramp-high-index = <19>;
+				qcom,ramp-pattern-repeat;
+				qcom,lpg-sdam-base = <0x72>;
 			};
 		};
 

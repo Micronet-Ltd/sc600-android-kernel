@@ -1750,7 +1750,7 @@ OF_EARLYCON_DECLARE(msm_serial_dm, "qcom,msm-uartdm",
 static struct uart_driver msm_uart_driver;
 
 static struct console msm_console = {
-	.name = "ttyMSM",
+	.name = "ttyHSL",
 	.write = msm_console_write,
 	.device = uart_console_device,
 	.setup = msm_console_setup,
@@ -1768,7 +1768,7 @@ static struct console msm_console = {
 static struct uart_driver msm_uart_driver = {
 	.owner = THIS_MODULE,
 	.driver_name = "msm_serial",
-	.dev_name = "ttyMSM",
+	.dev_name = "ttyHSL",
 	.nr = UART_NR,
 	.cons = MSM_CONSOLE,
 };

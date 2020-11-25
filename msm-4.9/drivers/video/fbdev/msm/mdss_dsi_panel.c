@@ -404,7 +404,7 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 				gpio_free(ctrl_pdata->intf_mux_gpio);
 		}
 	}
-
+/*rid: dba_panel also reset
 	if ((mdss_dsi_is_right_ctrl(ctrl_pdata) &&
 		mdss_dsi_is_hw_config_split(ctrl_pdata->shared_data)) ||
 			pinfo->is_dba_panel) {
@@ -412,7 +412,7 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			__func__, __LINE__);
 		return rc;
 	}
-
+*/
 	if (!gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 		pr_debug("%s:%d, reset line not configured\n",
 			   __func__, __LINE__);

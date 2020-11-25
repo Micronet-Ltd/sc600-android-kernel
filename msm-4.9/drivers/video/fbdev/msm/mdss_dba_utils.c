@@ -25,11 +25,16 @@
 #define CEC_BUF_SIZE    (MAX_CEC_FRAME_SIZE + 1)
 #define MAX_SWITCH_NAME_SIZE        5
 #define MSM_DBA_MAX_PCLK 148500
-#define DEFAULT_VIDEO_RESOLUTION HDMI_VFRMT_640x480p60_4_3
+
+#define DEFAULT_VIDEO_RESOLUTION DEFAULT_VFRMT
+//#define DEFAULT_VIDEO_RESOLUTION HDMI_VFRMT_640x480p60_4_3
+//#define DEFAULT_VIDEO_RESOLUTION HDMI_VFRMT_1280x720p60_16_9
+//#define DEFAULT_VIDEO_RESOLUTION HDMI_VFRMT_1920x1080p60_16_9
 
 struct mdss_dba_utils_data {
 	struct msm_dba_ops ops;
 	bool hpd_state;
+	struct platform_device *pdev;
 	bool audio_switch_registered;
 	bool display_switch_registered;
 	struct extcon_dev sdev_display;
@@ -103,7 +108,7 @@ static void mdss_dba_utils_notify_display(
 
 	state = udata->sdev_display.state;
 
-	extcon_set_state_sync(&udata->sdev_display, 0, val);
+	extcon_set_state_sync(&udata->sdev_display, EXTCON_DISP_HDMI, val);
 
 	pr_debug("cable state %s %d\n",
 		udata->sdev_display.state == state ?
@@ -715,6 +720,11 @@ lane_cfg:
 	}
 }
 
+static const unsigned int hdmi_extcon_cable[] = {
+	EXTCON_DISP_HDMI,
+	EXTCON_NONE,
+};
+
 /**
  * mdss_dba_utils_init() - Allow clients to register with DBA utils
  * @uid: Initialization data for registration.
@@ -728,7 +738,7 @@ lane_cfg:
  * Return: Instance of DBA utils which needs to be sent as parameter
  * when calling DBA utils APIs.
  */
-void *mdss_dba_utils_init(struct mdss_dba_utils_init_data *uid)
+void *mdss_dba_utils_init(struct mdss_dba_utils_init_data *uid, struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	struct hdmi_edid_init_data edid_init_data;
 	struct mdss_dba_utils_data *udata = NULL;
@@ -750,6 +760,9 @@ void *mdss_dba_utils_init(struct mdss_dba_utils_init_data *uid)
 
 	memset(&edid_init_data, 0, sizeof(edid_init_data));
 	memset(&info, 0, sizeof(info));
+
+	udata->sdev_display.supported_cable = hdmi_extcon_cable;
+	udata->sdev_display.dev.parent = &(ctrl_pdata->pdev->dev);
 
 	/* initialize DBA registration data */
 	strlcpy(info.client_name, uid->client_name, MSM_DBA_CLIENT_NAME_LEN);

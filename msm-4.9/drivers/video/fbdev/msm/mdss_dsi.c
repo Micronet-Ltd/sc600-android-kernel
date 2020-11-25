@@ -2585,7 +2585,7 @@ static void mdss_dsi_dba_work(struct work_struct *work)
 	else
 		utils_init_data.cont_splash_enabled = false;
 
-	pinfo->dba_data = mdss_dba_utils_init(&utils_init_data);
+	pinfo->dba_data = mdss_dba_utils_init(&utils_init_data, ctrl_pdata);
 
 	if (!IS_ERR_OR_NULL(pinfo->dba_data)) {
 		ctrl_pdata->ds_registered = true;
@@ -3305,6 +3305,8 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 		pr_err("%s: Unable to get the ctrl_pdata\n", __func__);
 		return -EINVAL;
 	}
+
+	ctrl_pdata->pdev = pdev;
 
 	platform_set_drvdata(pdev, ctrl_pdata);
 

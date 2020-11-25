@@ -474,6 +474,7 @@ enum msm8953_functions {
 	msm_mux_flash_strobe,
 	msm_mux_cci_timer0,
 	msm_mux_cci_timer1,
+	msm_mux_gp0_clk_a, //raynor
 	msm_mux_cam_irq,
 	msm_mux_cci_timer2,
 	msm_mux_blsp1_spi,
@@ -836,6 +837,9 @@ static const char * const cci_timer0_groups[] = {
 };
 static const char * const cci_timer1_groups[] = {
 	"gpio34",
+};
+static const char * const gp0_clk_a_groups[] = { //raynor
+    "gpio33",
 };
 static const char * const cam_irq_groups[] = {
 	"gpio35",
@@ -1309,6 +1313,7 @@ static const struct msm_function msm8953_functions[] = {
 	FUNCTION(flash_strobe),
 	FUNCTION(cci_timer0),
 	FUNCTION(cci_timer1),
+	FUNCTION(gp0_clk_a),//raynor
 	FUNCTION(cam_irq),
 	FUNCTION(cci_timer2),
 	FUNCTION(blsp1_spi),
@@ -1501,7 +1506,7 @@ static const struct msm_pingroup msm8953_groups[] = {
 		 NA, NA),
 	PINGROUP(31, cci_i2c, NA, NA, NA, qdss_tracedata_a, NA, NA, NA, NA),
 	PINGROUP(32, cci_i2c, NA, NA, NA, qdss_tracedata_a, NA, NA, NA, NA),
-	PINGROUP(33, cci_timer0, NA, NA, NA, NA, qdss_tracedata_a, NA, NA, NA),
+	PINGROUP(33, cci_timer0, gp0_clk_a, NA, NA, NA, qdss_tracedata_a, NA, NA, NA),//rid
 	PINGROUP(34, cci_timer1, NA, NA, NA, NA, qdss_tracedata_a, NA, NA, NA),
 	PINGROUP(35, cci_timer2, blsp1_spi, pwr_nav_enabled_a, NA, NA, NA,
 		 qdss_tracedata_a, NA, NA),

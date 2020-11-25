@@ -28,6 +28,12 @@
 #include "dsi-panel-boent51021-1200p-video.dtsi"
 #include "dsi-panel-hx8394d-wxga-video.dtsi"
 #include "dsi-panel-inxnt51021-1200p-video.dtsi"
+#include "dsi-panel-ili9881c-720p-video.dtsi"
+#include "dsi-panel-ili9881c-720p-dsi1-video.dtsi"
+#include "dsi-panel-hx8394f-720p-video.dtsi"
+#include "dsi-panel-hx8394f-720p-dsi1-video.dtsi"
+#include "dsi-panel-ili9881d-720p-video.dtsi"
+#include "dsi-panel-ili9881d-720p-dsi1-video.dtsi"
 
 &soc {
 	dsi_panel_pwr_supply: dsi_panel_pwr_supply {
@@ -51,6 +57,7 @@
 			qcom,supply-enable-load = <100000>;
 			qcom,supply-disable-load = <100>;
 		};
+		/*kyle delete
 		qcom,panel-supply-entry@2 {
 			reg = <2>;
 			qcom,supply-name = "lab";
@@ -59,6 +66,7 @@
 			qcom,supply-enable-load = <100000>;
 			qcom,supply-disable-load = <100>;
 		};
+
 		qcom,panel-supply-entry@3 {
 			reg = <3>;
 			qcom,supply-name = "ibb";
@@ -67,9 +75,64 @@
 			qcom,supply-enable-load = <100000>;
 			qcom,supply-disable-load = <100>;
 			qcom,supply-post-on-sleep = <10>;
-		};
+		};*/
 	};
 };
+
+&dsi_ili9881d_720p_video {
+    qcom,mdss-dsi-panel-timings-phy-v2 = [
+        1e 1b 04 06 02 03 04 a0     /*Data 0*/
+        1e 1b 04 06 02 03 04 a0     /*Data 1*/
+        1e 1b 04 06 02 03 04 a0     /*Data 2*/
+        1e 1b 04 06 02 03 04 a0     /*Data 3*/
+        1e 0d 04 05 02 03 04 a0];   /*CLK lane*/
+};
+
+&dsi_ili9881d_720p_dsi1_video {
+    qcom,mdss-dsi-panel-timings-phy-v2 = [
+        1e 1b 04 06 02 03 04 a0     /*Data 0*/
+        1e 1b 04 06 02 03 04 a0     /*Data 1*/
+        1e 1b 04 06 02 03 04 a0     /*Data 2*/
+        1e 1b 04 06 02 03 04 a0     /*Data 3*/
+        1e 0d 04 05 02 03 04 a0];   /*CLK lane*/
+};
+
+&dsi_hx8394f_720p_video {
+    qcom,mdss-dsi-panel-timings-phy-v2 = [
+        1e 1b 04 05 02 03 04 a0     /*Data 0*/
+        1e 1b 04 05 02 03 04 a0     /*Data 1*/
+        1e 1b 04 05 02 03 04 a0     /*Data 2*/
+        1e 1b 04 05 02 03 04 a0     /*Data 3*/
+        1e 0d 03 05 02 03 04 a0];   /*CLK lane*/
+};
+
+&dsi_hx8394f_720p_dsi1_video {
+    qcom,mdss-dsi-panel-timings-phy-v2 = [
+        1e 1b 04 05 02 03 04 a0     /*Data 0*/
+        1e 1b 04 05 02 03 04 a0     /*Data 1*/
+        1e 1b 04 05 02 03 04 a0     /*Data 2*/
+        1e 1b 04 05 02 03 04 a0     /*Data 3*/
+        1e 0d 03 05 02 03 04 a0];   /*CLK lane*/
+};
+
+&dsi_ili9881c_720p_video {
+    qcom,mdss-dsi-panel-timings-phy-v2 = [
+        1e 1b 04 06 02 03 04 a0     /*Data 0*/
+        1e 1b 04 06 02 03 04 a0     /*Data 1*/
+        1e 1b 04 06 02 03 04 a0     /*Data 2*/
+        1e 1b 04 06 02 03 04 a0     /*Data 3*/
+        1e 0d 04 05 02 03 04 a0];   /*CLK lane*/
+};
+
+&dsi_ili9881c_720p_dsi1_video {
+    qcom,mdss-dsi-panel-timings-phy-v2 = [
+        1e 1b 04 06 02 03 04 a0     /*Data 0*/
+        1e 1b 04 06 02 03 04 a0     /*Data 1*/
+        1e 1b 04 06 02 03 04 a0     /*Data 2*/
+        1e 1b 04 06 02 03 04 a0     /*Data 3*/
+        1e 0d 04 05 02 03 04 a0];   /*CLK lane*/
+};
+
 
 &dsi_truly_1080_vid {
 	qcom,mdss-dsi-panel-timings-phy-v2 = [23 1e 08 09 05 03 04 a0

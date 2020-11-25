@@ -20,15 +20,15 @@
 	model = "MTP";
 	qcom,board-id = <8 0>;
 };
-
+/*
 &vendor {
 	mtp_batterydata: qcom,battery-data {
 		qcom,batt-id-range-pct = <15>;
 		#include "batterydata-itech-3000mah.dtsi"
 		#include "batterydata-ascent-3450mAh.dtsi"
 	};
-};
-
+};*/
+/*
 &qpnp_fg {
 	qcom,battery-data = <&mtp_batterydata>;
 };
@@ -45,3 +45,4 @@
 	qcom,chg-led-sw-controls;
 	qcom,chg-led-support;
 };
+*/

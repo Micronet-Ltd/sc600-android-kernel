@@ -16,6 +16,7 @@
 #include <linux/types.h>
 
 #include "mdss_panel.h"
+#include "mdss_dsi.h"
 
 /**
  * struct mdss_dba_utils_init_data - Init data for registering with DBA utils.
@@ -36,6 +37,7 @@ struct mdss_dba_utils_init_data {
 	u32 fb_node;
 	char *chip_name;
 	char *client_name;
+	struct platform_device *pdev;
 	struct mdss_panel_info *pinfo;
 	bool cont_splash_enabled;
 };
@@ -44,7 +46,7 @@ int mdss_dba_utils_video_on(void *data, struct mdss_panel_info *pinfo);
 int mdss_dba_utils_video_off(void *data);
 void mdss_dba_utils_hdcp_enable(void *data, bool enable);
 
-void *mdss_dba_utils_init(struct mdss_dba_utils_init_data *init_data);
+void *mdss_dba_utils_init(struct mdss_dba_utils_init_data *init_data,  struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 void mdss_dba_utils_deinit(void *data);
 void mdss_dba_update_lane_cfg(struct mdss_panel_info *pinfo);
 #endif /* __MDSS_DBA_UTILS__ */

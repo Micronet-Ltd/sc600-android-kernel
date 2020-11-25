@@ -158,6 +158,52 @@ static size_t build_pmic_string(char *buf, size_t n, int sid,
 	return pos;
 }
 
+#define QUECTEL_QDEVINFO_CMD
+#ifdef  QUECTEL_QDEVINFO_CMD
+
+static char quectel_pmic_info[64] = {'\0'};
+
+static size_t quectel_get_pmic_string(int sid, u8 subtype, u8 rev3, u8 rev4)
+{
+    char buf[64] = {'\0'};
+    int sid_temp = 0;
+
+    if (quectel_pmic_info[0] != '\0')
+        sprintf(buf, "%s,", quectel_pmic_info); //add a "," for pm and pmi
+    else
+        memcpy(buf, quectel_pmic_info, 64);
+
+    if (((int)subtype == PM8941_PERIPHERAL_SUBTYPE
+                || (int)subtype == PM8226_PERIPHERAL_SUBTYPE)
+            && rev4 < 0x02)
+        rev4++;
+
+    sid_temp = sid;
+
+    if (sid == 0) {
+        printk(KERN_INFO "type = %d\n", subtype);
+        sid_temp = 1;
+
+        if (pmic_names[subtype] == NULL) {
+            sprintf(quectel_pmic_info, "PM8953v%d.%d", rev4, rev3);
+            return 0;
+        }
+    }
+    sprintf(quectel_pmic_info, "%s%sv%d.%d", buf, pmic_names[subtype], rev4, rev3);
+
+    return 0;
+}
+
+void quectel_get_pmic_info(char *buf)
+{
+    snprintf(buf, sizeof(quectel_pmic_info), "%s", quectel_pmic_info);
+    return;
+}
+
+EXPORT_SYMBOL(quectel_get_pmic_info);
+
+#endif /* QUECTEL_QDEVINFO_CMD */
+
 #define PMIC_PERIPHERAL_TYPE		0x51
 #define PMIC_STRING_MAXLENGTH		80
 static int qpnp_revid_probe(struct platform_device *pdev)
@@ -250,6 +296,10 @@ static int qpnp_revid_probe(struct platform_device *pdev)
 	build_pmic_string(pmic_string, PMIC_STRING_MAXLENGTH,
 			  to_spmi_device(pdev->dev.parent)->usid,
 			pmic_subtype, rev1, rev2, rev3, rev4);
+#ifdef QUECTEL_QDEVINFO_CMD
+    quectel_get_pmic_string(to_spmi_device(pdev->dev.parent)->usid,
+            pmic_subtype, rev3, rev4);
+#endif
 	pr_info("%s options: %d, %d, %d, %d\n",
 			pmic_string, option1, option2, option3, option4);
 	return 0;

@@ -1,0 +1,161 @@
+/*
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/clock/msm-clocks-8953.h>
+
+
+#include "msm8953-mdss-panels.dtsi"
+
+&pmi632_gpios {
+     pwm_out {
+             pwm_out_default: pwm_out_default {
+             pins = "gpio6"; /* GPIO 6 */
+             function = "func1"; /* Special Function 1 */
+             bias-disable; /* No Pull */
+             power-source = <0>; /* VIN0 */
+             output-low; /* digital output, no invert */
+             qcom,drive-strength = <3>; /* LOW strength */
+             drive-push-pull; /* CMOS */
+	     };
+    };
+};
+
+&mdss_mdp {
+	qcom,mdss-pref-prim-intf = "dsi";
+};
+
+&mdss_dsi {
+	hw-config = "dual_dsi"; //"single_dsi";
+};
+
+&mdss_dsi0 {
+	qcom,dsi-pref-prim-pan = <&dsi_ili9881d_720p_video>;
+	pinctrl-names = "mdss_default", "mdss_sleep";
+	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
+
+	qcom,platform-te-gpio = <&tlmm 24 0>;
+		qcom,platform-reset-gpio = <&tlmm 61 0>;
+	qcom,platform-bklight-en-gpio = <&pm8953_gpios 4 0>;
+//	qcom,platform-enable-gpio = <&pmi632_gpios 6 0>;
+};
+
+&mdss_dsi1 {
+	status = "ok";
+	qcom,dsi-pref-prim-pan = <&dsi_ili9881d_720p_dsi1_video>;
+	pinctrl-names = "mdss_default", "mdss_sleep";
+	pinctrl-0 = <&mdss_dsi1_active &mdss_te1_active>;
+	pinctrl-1 = <&mdss_dsi1_suspend &mdss_te1_suspend>;
+
+	qcom,bridge-index = <0>;
+	qcom,pluggable;
+	qcom,platform-te-gpio = <&tlmm 25 0>;
+	qcom,platform-reset-gpio = <&tlmm 87 0>;
+//	qcom,platform-bklight-en-gpio = <&tlmm 59 0>;
+};
+
+&dsi_ili9881d_720p_video {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_pwm";
+	qcom,mdss-dsi-bl-pmic-pwm-frequency = <100>;
+	qcom,mdss-dsi-bl-pmic-bank-select = <0>;
+	qcom,mdss-dsi-bl-pwm-pmi;
+	pwms = <&pmi632_pwm 3 1000000>;
+	qcom,mdss-dsi-pwm-gpio = <&pmi632_gpios 6 0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm_out_default>;
+};
+
+&dsi_ili9881d_720p_dsi1_video {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,dba-panel;
+	qcom,bridge-name = "dsi1-bridge";
+};
+
+
+&dsi_hx8394f_720p_video {
+    qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+    qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_pwm";
+    qcom,mdss-dsi-bl-pmic-pwm-frequency = <100>;
+    qcom,mdss-dsi-bl-pmic-bank-select = <0>;
+    qcom,mdss-dsi-bl-pwm-pmi;
+    pwms = <&pmi632_pwm 3 1000000>;
+    qcom,mdss-dsi-pwm-gpio = <&pmi632_gpios 6 0>;
+    pinctrl-names = "default";
+    pinctrl-0 = <&pwm_out_default>;
+};
+
+&dsi_hx8394f_720p_dsi1_video {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,dba-panel;
+	qcom,bridge-name = "dsi1-bridge";
+};
+
+&dsi_ili9881c_720p_video {
+    qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+    qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_pwm";
+    qcom,mdss-dsi-bl-pmic-pwm-frequency = <100>;
+    qcom,mdss-dsi-bl-pmic-bank-select = <0>;
+    qcom,mdss-dsi-bl-pwm-pmi;
+    pwms = <&pmi632_pwm 3 1000000>;
+    qcom,mdss-dsi-pwm-gpio = <&pmi632_gpios 6 0>;
+    pinctrl-names = "default";
+    pinctrl-0 = <&pwm_out_default>;
+};
+
+&dsi_ili9881c_720p_dsi1_video {
+    qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+    qcom,dba-panel;
+    qcom,bridge-name = "dsi1-bridge";
+};
+
+
+&dsi_truly_1080_vid {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,mdss-dsi-pan-enable-dynamic-fps;
+	qcom,mdss-dsi-min-refresh-rate = <48>;
+	qcom,mdss-dsi-max-refresh-rate = <60>;
+	qcom,mdss-dsi-pan-fps-update = "dfps_immediate_porch_mode_vfp";
+};
+
+&dsi_hx8399c_truly_vid {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,mdss-dsi-pan-enable-dynamic-fps;
+	qcom,mdss-dsi-pan-fps-update = "dfps_immediate_porch_mode_vfp";
+};
+
+&dsi_truly_1080_cmd {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,ulps-enabled;
+	qcom,partial-update-enabled;
+	qcom,panel-roi-alignment = <2 2 4 2 1080 2>;
+};
+
+
+&cci {
+	 qcom,camera@0 {
+		qcom,led-flash-src = <&led_flash0>;
+	};
+};
+&soc {
+//rid:add dsi1 bridge for dual mipi dsi
+    qcom,dsi1_bridge {
+        compatible = "qcom,dsi1_bridge";
+        instance_id = <0>;
+        mdss-dsi-bl-pmic-pwm-frequency = <100>;
+        mdss-dsi-bl-pmic-bank-select = <0>;
+        mdss-dsi-bl-max-level = <4095>;
+    };
+};

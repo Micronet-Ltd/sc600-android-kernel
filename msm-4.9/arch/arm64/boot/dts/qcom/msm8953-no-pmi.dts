@@ -1,0 +1,72 @@
+/*
+ * Copyright (c) 2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include "msm8953.dtsi"
+#include "msm8953-nopmi-panel-camera.dtsi"
+/ {
+	model = "Qualcomm Technologies, Inc. msm8953 + NO PMI SOC";
+	compatible = "qcom,msm8953";
+	qcom,pmic-id = <0x010016 0x0 0x0 0x0>;
+	qcom,pmic-name = "NOPMI";
+};
+
+&pm8953_gpios {
+	usb_detect_gpio {
+		usb_detect_gpio_default: usb_detect_gpio_default {
+		pins = "gpio7";
+		function = "normal";
+		input-enable;
+		bias-disable;
+		power-source = <3>;
+		};
+	};
+};
+
+&pm8953_typec {
+	ss-mux-supply = <&pm8953_l13>;
+	qcom,ssmux-gpio = <&tlmm 139 GPIO_ACTIVE_LOW>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&typec_ssmux_config>;
+};
+
+&soc {
+	usb_detect: qcom,usb_detect {
+		compatible = "qcom,gpio-usbdetect";
+		interrupt-parent = <&spmi_bus>;
+		//interrupts = <0x0 0xc6 0>;
+		qcom,vbus-det-gpio = <&pm8953_gpios 7 0x00>;
+		qcom,usbid-det-gpio = <&tlmm 1 0x01>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&usb_detect_gpio_default &usbid_detect_config_default>;
+	};
+};
+
+&usb3 {
+	extcon = <&usb_detect>;
+	vbus_dwc3-supply = <&oem_otg_ext_vreg>;
+};
+
+&rpm_bus {
+//jeffery add otg 2019.3.14
+	oem_otg_ext_vreg: oem_otg_ext_vreg { 
+		compatible = "regulator-fixed"; 
+		regulator-name = "oem_otg_ext_vreg"; 
+		gpio = <&tlmm 97 0x0>; 
+		status = "ok"; 
+		enable-active-high; 
+		pinctrl-names = "active"; 
+		pinctrl-0 = <&oem_otg_vreg_active>; 
+	};
+};

@@ -15,6 +15,7 @@
 
 #include "msm8953.dtsi"
 #include "sdm450-pmi632.dtsi"
+#include "msm8953-pmi632-panel-camera.dtsi"
 
 / {
 	model = "Qualcomm Technologies, Inc. msm8953 + PMI632 SOC";

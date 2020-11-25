@@ -1745,6 +1745,9 @@ struct subsys_device *subsys_register(struct subsys_desc *desc)
 	strlcpy(subsys->desc->fw_name, desc->name,
 			sizeof(subsys->desc->fw_name));
 
+	if(strcmp(desc->name,"modem") == 0)
+		subsys->restart_level = RESET_SUBSYS_COUPLED;
+
 	subsys->notify = subsys_notif_add_subsys(desc->name);
 
 	snprintf(subsys->wlname, sizeof(subsys->wlname), "ssr(%s)", desc->name);

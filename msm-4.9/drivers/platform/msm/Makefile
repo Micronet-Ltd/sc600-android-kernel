@@ -8,6 +8,7 @@ obj-$(CONFIG_SPS) += sps/
 obj-$(CONFIG_QPNP_COINCELL) += qpnp-coincell.o
 obj-$(CONFIG_QPNP_REVID) += qpnp-revid.o
 obj-$(CONFIG_MSM_RMNET_BAM) += msm_rmnet_bam.o
+obj-y += gpio-usbdetect.o
 obj-$(CONFIG_GPIO_USB_DETECT) += gpio-usbdetect.o
 obj-$(CONFIG_EP_PCIE) += ep_pcie/
 obj-$(CONFIG_MSM_MHI_DEV) += mhi_dev/

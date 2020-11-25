@@ -315,25 +315,6 @@
 	};
 };
 
-&spmi_bus {
-	qcom,pm8953@1 {
-		/* PM8953 S5 + S6 = VDD_APC supply */
-		pm8953_s5: spm-regulator@2000 {
-			compatible = "qcom,spm-regulator";
-			reg = <0x2000 0x100>;
-			regulator-name = "pm8953_s5";
-			regulator-min-microvolt = <400000>;
-			regulator-max-microvolt = <1140000>;
-
-			pm8953_s5_limit: avs-limit-regulator {
-				regulator-name = "pm8953_s5_avs_limit";
-				regulator-min-microvolt = <400000>;
-				regulator-max-microvolt = <1140000>;
-			};
-		};
-	};
-};
-
 &soc {
 	apc_mem_acc_vreg: regulator@19461d4 {
 		compatible = "qcom,mem-acc-regulator";

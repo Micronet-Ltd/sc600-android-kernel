@@ -1279,17 +1279,48 @@ config FT_SECURE_TOUCH
 
 	  If unsure, say N.
 
-config TOUCHSCREEN_GT9XX_v28
-	bool "Goodix touchpanel GT9xx_v28 series"
+config TOUCHSCREEN_GT9XX
+	bool "Goodix touchpanel GT9xx series"
 	depends on I2C
 	help
-	  Say Y here if you have a Goodix GT9xx_v28 touchscreen.
+	  Say Y here if you have a Goodix GT9xx touchscreen.
 	  Gt9xx controllers are multi touch controllers which can
 	  report 5 touches at a time.
 
           If unsure, say N.
 
-source "drivers/input/touchscreen/gt9xx_v2.8/Kconfig"
+config TOUCHSCREEN_GT9XX_SEC
+    bool "Goodix touchpanel GT9xx_SEC series"
+    depends on I2C
+    help
+      Say Y here if you have a Goodix GT9xx touchscreen.
+      Gt9xx controllers are multi touch controllers which can
+      report 5 touches at a time.
+
+          If unsure, say N.
+
+config TOUCHSCREEN_GT1X
+    bool "Goodix touchpanel GT1x series"
+    depends on I2C
+    help
+      Say Y here if you have a Goodix GT1x touchscreen.
+      Gt1x controllers are multi touch controllers which can
+      report 5 touches at a time.
+
+      If unsure, say N.
+
+config TOUCHSCREEN_GT1X_SEC
+    bool "Goodix touchpanel GT1x_SEC series"
+    depends on I2C
+    help
+      Say Y here if you have a Goodix GT1x touchscreen.
+      Gt1x controllers are multi touch controllers which can
+      report 5 touches at a time.
+
+      If unsure, say N.
+source "drivers/input/touchscreen/gt9xx/Kconfig"
+source "drivers/input/touchscreen/gt9xx_second/Kconfig"
+source "drivers/input/touchscreen/focaltech_touch/Kconfig"
 
 config TOUCHSCREEN_HIMAX_CHIPSET
 	bool "Himax touchpanel CHIPSET"
@@ -1312,5 +1343,28 @@ config TOUCHSCREEN_EKTF3XXX_CHIPSET
 	  report 10 touches at a time.
 
 		  If unusre, say N.
+
+config CONFIG_TOUCHSCREEN_FTS
+       bool "Focaltech Touchscreen"
+       depends on I2C
+       help
+         Say Y here if you have a Focaltech Touchscreen.
+         Focaltech controllers are multi touch controllers which can
+         report 5 touches at a time.
+
+         If unsure, say N.
+
+config CONFIG_TOUCHSCREEN_FTS_SEC
+       bool "Focaltech Touchscreen"
+       depends on I2C
+       help
+         Say Y here if you have a Focaltech Touchscreen.
+         Focaltech controllers are multi touch controllers which can
+         report 5 touches at a time.
+
+         If unsure, say N.
+
+source "drivers/input/touchscreen/focaltech_touch/Kconfig"
+source "drivers/input/touchscreen/focaltech_touch_second/Kconfig"
 
 endif

@@ -1,0 +1,1 @@
+obj-$(CONFIG_TOUCHSCREEN_FTS_SEC) += focaltech_sec_upgrade_ft5446.o

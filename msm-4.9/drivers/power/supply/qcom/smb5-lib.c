@@ -2072,6 +2072,7 @@ int smblib_get_prop_typec_cc_orientation(struct smb_charger *chg,
 {
 	int rc = 0;
 	u8 stat;
+	bool cc_line = 0;
 
 	rc = smblib_read(chg, TYPE_C_MISC_STATUS_REG, &stat);
 	if (rc < 0) {
@@ -2080,10 +2081,33 @@ int smblib_get_prop_typec_cc_orientation(struct smb_charger *chg,
 	}
 	smblib_dbg(chg, PR_REGISTER, "TYPE_C_STATUS_4 = 0x%02x\n", stat);
 
-	if (stat & CC_ATTACHED_BIT)
+	if (stat & CC_ATTACHED_BIT){
 		val->intval = (bool)(stat & CC_ORIENTATION_BIT) + 1;
+		cc_line = stat & CC_ORIENTATION_BIT;
+	}
 	else
 		val->intval = 0;
+
+	if(val->intval == 0){
+		if (chg->ssmux_gpio) {
+			rc = gpio_direction_input(chg->ssmux_gpio);
+			if (rc) {
+				pr_err("failed to configure ssmux gpio rc=%d\n",rc);
+				return rc;
+			}
+		}
+	}
+	else{
+		if (chg->ssmux_gpio) {
+			rc = gpio_direction_output(chg->ssmux_gpio,
+				(chg->gpio_flag == OF_GPIO_ACTIVE_LOW)
+						? !cc_line : cc_line);
+			if (rc) {
+				pr_err("failed to configure ssmux gpio rc=%d\n",rc);
+				return rc;
+			}
+		}
+	}
 
 	return rc;
 }

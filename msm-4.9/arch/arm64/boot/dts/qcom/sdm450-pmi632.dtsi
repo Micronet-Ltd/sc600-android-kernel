@@ -43,7 +43,7 @@
 
 &pmi632_vadc {
 	pinctrl-names = "default";
-	pinctrl-0 = <&quiet_therm_default &smb_therm_default>;
+	pinctrl-0 = <&quiet_therm_default>;
 };
 
 &pmi632_gpios {
@@ -54,12 +54,12 @@
 		};
 	};
 
-	smb_therm {
+	/*smb_therm {
 		smb_therm_default: smb_therm_default {
 			pins = "gpio4";
 			bias-high-impedance;
 		};
-	};
+	};*/
 };
 
 &pmi632_qg {
@@ -68,6 +68,9 @@
 
 &pmi632_charger {
 	qcom,battery-data = <&mtp_batterydata>;
+	qcom,ssmux-gpio = <&tlmm 139 GPIO_ACTIVE_LOW>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&typec_ssmux_config>;
 };
 
 &pm8953_gpios {
@@ -75,8 +78,8 @@
 		bklt_en_default: bklt_en_default {
 		pins = "gpio4";
 		function = "normal";
-		power-source = <0>;
-		output-high;
+		power-source = <3>;
+		//output-high;
 		};
 	};
 };
@@ -85,6 +88,21 @@
 	status = "ok";
 };
 
+&soc {
+	gpio-leds {
+        compatible = "gpio-leds";
+        status = "ok";
+        // pinctrl-names = "default";
+        // pinctrl-0 = <&gpio_led_off>;
+        red {
+            gpios = <&tlmm 36 0>;
+            label = "red";
+            linux,default-trigger = "none";
+            default-state = "off";
+            retain-state-suspended;
+        };
+    };
+};
 &thermal_zones {
 	pmi-vbat-lvl0 {
 		cooling-maps {

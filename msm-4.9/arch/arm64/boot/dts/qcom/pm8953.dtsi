@@ -40,6 +40,10 @@
 			qcom,pon_1 {
 				qcom,pon-type = <0>;
 				qcom,pull-up = <1>;
+				qcom,support-reset = <1>;
+				qcom,s1-timer = <6720>;
+				qcom,s2-timer = <1000>;
+				qcom,s2-type = <4>;
 				linux,code = <116>;
 			};
 
@@ -82,7 +86,7 @@
 
 			case_therm {
 				cas_therm_default: cas_therm_default {
-					pins = "mpp4";
+					//pins = "mpp4";
 					function = "analog";
 					input-enable;
 					qcom,amux-route = <3>;
@@ -99,7 +103,7 @@
 			};
 		};
 
-		pm8953_gpios: gpios {
+		pm8953_gpios: pinctrl@c000 {
 			compatible = "qcom,spmi-gpio";
 			reg = <0xc000 0x800>;
 
@@ -209,7 +213,7 @@
 				qcom,fast-avg-setup = <0>;
 			};
 
-			chan@11 {
+			/*chan@11 {
 				label = "pa_therm1";
 				reg = <0x11>;
 				qcom,decimation = <0>;
@@ -218,6 +222,17 @@
 				qcom,scale-function = <2>;
 				qcom,hw-settle-time = <2>;
 				qcom,fast-avg-setup = <0>;
+			};*/
+
+			chan@21 {
+				label = "mpp2_adc";
+				reg = <0x21>;
+				qcom,decimation = <0>;
+				qcom,pre-div-channel-scaling = <1>;
+				qcom,calibration-type = "absolute";
+				qcom,scale-function = <0>;
+				qcom,hw-settle-time = <1>;
+				qcom,fast-avg-setup = <2>;
 			};
 
 
@@ -338,12 +353,29 @@
 		};
 	};
 
+	qcom,pm8953@1 {
+		/* PM8953 S5 + S6 = VDD_APC supply */
+		pm8953_s5: spm-regulator@2000 {
+			compatible = "qcom,spm-regulator";
+			reg = <0x2000 0x100>;
+			regulator-name = "pm8953_s5";
+			regulator-min-microvolt = <400000>;
+			regulator-max-microvolt = <1140000>;
+
+			pm8953_s5_limit: avs-limit-regulator {
+				regulator-name = "pm8953_s5_avs_limit";
+				regulator-min-microvolt = <400000>;
+				regulator-max-microvolt = <1140000>;
+			};
+		};
+	};
+
 	pm8953_1: qcom,pm8953@1 {
 		compatible = "qcom,spmi-pmic";
 		reg = <0x1 SPMI_USID>;
 		#address-cells = <1>;
 		#size-cells = <1>;
-
+#if 0
 		pm8953_pwm: qcom,pwms@bc00 {
 			status = "disabled";
 			compatible = "qcom,pwm-lpg";
@@ -351,6 +383,19 @@
 			reg-names = "lpg-base";
 			#pwm-cells = <2>;
 		};
+#endif
+		//rid:enable mpp4 to pwm output
+        pm8953_pwm: pwm@bc00 {
+            status = "ok";
+            compatible = "qcom,qpnp-pwm";
+            reg = <0xbc00 0x100>;
+            reg-names = "qpnp-lpg-channel-base";
+            qcom,channel-id = <0>;
+            qcom,supported-sizes = <6>, <9>;
+            #pwm-cells = <2>;
+            qcom,dtest-line = <2>;
+            qcom,dtest-output = <2>;
+        };
 	};
 };
 
@@ -408,4 +453,19 @@
 			};
 		};
 	};
+};
+//raynor add pwm config
+&pm8953_mpps {
+    pinctrl-names = "default";
+    pinctrl-0 = <&pm_mpp4_pwm_ctrl_default>;
+    pm_mpp4_pwm_ctrl_default: pm8953_mpp4 {
+        pins = "mpp4"; /* WLED_PWM_CTRL */
+        function = "digital"; /* Digital */
+        output-low;    /* Output */
+        drive-strength = <2>; /* 1.8 mA */
+        power-source = <3>; /* VPH_PWR */
+        qcom,dtest = <2>; /* DTEST2 */
+        bias-disable = <0>; /* no pull */
+        status = "okay";
+    };
 };

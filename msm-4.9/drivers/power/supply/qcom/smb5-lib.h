@@ -19,6 +19,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/extcon.h>
 #include <linux/alarmtimer.h>
+#include <linux/of_gpio.h>
 #include "storm-watch.h"
 
 enum print_reason {
@@ -438,6 +439,10 @@ struct smb_charger {
 	u32			headroom_mode;
 	bool			flash_init_done;
 	bool			flash_active;
+
+	/*typec ssmux jeffery add*/
+	int 			ssmux_gpio;
+	enum of_gpio_flags gpio_flag;
 };
 
 int smblib_read(struct smb_charger *chg, u16 addr, u8 *val);

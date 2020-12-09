@@ -10,7 +10,7 @@
  * GNU General Public License for more details.
  */
 
-#define pr_fmt(fmt)	"FG: %s: " fmt, __func__
+#define pr_fmt(fmt)	"qpnp_fg: %s: " fmt, __func__
 
 #include <linux/atomic.h>
 #include <linux/delay.h>
@@ -312,7 +312,8 @@ static struct fg_mem_data fg_backup_regs[FG_BACKUP_MAX] = {
 	BACKUP(MAH_TO_SOC,	0x4A0,   0,      4,     -EINVAL),
 };
 
-static int fg_debug_mask;
+static int fg_debug_mask = FG_STATUS|FG_POWER_SUPPLY|FG_IRQS;
+	
 module_param_named(
 	debug_mask, fg_debug_mask, int, 00600
 );
@@ -2232,7 +2233,9 @@ static int get_monotonic_soc_raw(struct fg_chip *chip)
 		return -EINVAL;
 	}
 
-	if (fg_debug_mask & FG_POWER_SUPPLY)
+
+
+	if (fg_debug_mask & FG_AGING)
 		pr_info_ratelimited("raw: 0x%02x\n", cap[0]);
 	return cap[0];
 }
@@ -2320,7 +2323,7 @@ static int64_t get_batt_id(unsigned int battery_id_uv, u8 bid_info)
 #define DEFAULT_TEMP_DEGC	250
 static int get_sram_prop_now(struct fg_chip *chip, unsigned int type)
 {
-	if (fg_debug_mask & FG_POWER_SUPPLY)
+	if (fg_debug_mask & FG_MEM_DEBUG_READS)
 		pr_info("addr 0x%02X, offset %d value %d\n",
 			fg_data[type].address, fg_data[type].offset,
 			fg_data[type].value);
@@ -2337,7 +2340,7 @@ static int get_sram_prop_now(struct fg_chip *chip, unsigned int type)
 static int get_prop_jeita_temp(struct fg_chip *chip, unsigned int type)
 {
 	if (fg_debug_mask & FG_POWER_SUPPLY)
-		pr_info("addr 0x%02X, offset %d\n", settings[type].address,
+		pr_debug("addr 0x%02X, offset %d\n", settings[type].address,
 			settings[type].offset);
 
 	return settings[type].value;
@@ -2349,7 +2352,7 @@ static int set_prop_jeita_temp(struct fg_chip *chip,
 	int rc = 0;
 
 	if (fg_debug_mask & FG_POWER_SUPPLY)
-		pr_info("addr 0x%02X, offset %d temp%d\n",
+		pr_debug("addr 0x%02X, offset %d temp%d\n",
 			settings[type].address,
 			settings[type].offset, decidegc);
 
@@ -3125,7 +3128,7 @@ static void slope_limiter_work(struct work_struct *work)
 
 	chip->slope_limit_sts = status;
 	if (fg_debug_mask & FG_STATUS)
-		pr_info("Slope limit sts: %d val: %lld buf[%x %x] written\n",
+		pr_notice("Slope limit sts: %d val: %lld buf[%x %x] written\n",
 			status, val, buf[0], buf[1]);
 out:
 	fg_relax(&chip->slope_limit_wakeup_source);
@@ -4030,10 +4033,10 @@ static void status_change_work(struct work_struct *work)
 		if (capacity >= 99 && chip->hold_soc_while_full
 				&& chip->health == POWER_SUPPLY_HEALTH_GOOD) {
 			if (fg_debug_mask & FG_STATUS)
-				pr_info("holding soc at 100\n");
+				pr_notice("holding soc at 100\n");
 			chip->charge_full = true;
 		} else if (fg_debug_mask & FG_STATUS) {
-			pr_info("terminated charging at %d/0x%02x\n",
+			pr_notice("terminated charging at %d/0x%02x\n",
 					capacity, get_monotonic_soc_raw(chip));
 		}
 	}
@@ -4158,9 +4161,9 @@ static void status_change_work(struct work_struct *work)
 		 */
 		if (chip->sw_cc_soc_data.full_capacity >
 				MAX_BATTERY_CC_SOC_CAPACITY) {
-			pr_info("Battery possibly damaged, do not restart charging\n");
+			pr_notice("Battery possibly damaged, do not restart charging\n");
 		} else {
-			pr_info("Reset safety-timer and restart charging\n");
+			pr_notice("Reset safety-timer and restart charging\n");
 			rc = set_prop_enable_charging(chip, false);
 			if (rc) {
 				pr_err("failed to disable charging %d\n", rc);
@@ -5104,7 +5107,7 @@ static enum alarmtimer_restart fg_hard_jeita_alarm_cb(struct alarm *alarm,
 	}
 
 	if (health != POWER_SUPPLY_HEALTH_UNKNOWN) {
-		pr_debug("FG report battery health: %d\n", health);
+		pr_notice("FG report battery health: %d\n", health);
 		val.intval = health;
 		rc = power_supply_set_property(chip->batt_psy,
 				POWER_SUPPLY_PROP_HEALTH, &val);
@@ -5158,6 +5161,7 @@ static irqreturn_t fg_jeita_soft_hot_irq_handler(int irq, void *_chip)
 		/* cancel the alarm timer */
 		alarm_try_to_cancel(&chip->hard_jeita_alarm);
 	}
+    	pr_notice("%s[%d degiC]\n", (chip->batt_warm)?"warm":"good", get_sram_prop_now(chip, FG_DATA_BATT_TEMP));
 
 	return IRQ_HANDLED;
 }
@@ -5201,6 +5205,7 @@ static irqreturn_t fg_jeita_soft_cold_irq_handler(int irq, void *_chip)
 		/* cancel the alarm timer */
 		alarm_try_to_cancel(&chip->hard_jeita_alarm);
 	}
+	pr_notice("%s[%d degiC]\n", (chip->batt_cool)?"cool":"good", get_sram_prop_now(chip, FG_DATA_BATT_TEMP));
 
 	return IRQ_HANDLED;
 }
@@ -5513,7 +5518,7 @@ static void set_resume_soc_work(struct work_struct *work)
 				goto done;
 			}
 			if (fg_debug_mask & FG_STATUS) {
-				pr_info("resume soc set to 0x%02x\n",
+				pr_notice("resume soc set to 0x%02x\n",
 						resume_soc_raw);
 			}
 		} else if (settings[FG_MEM_RESUME_SOC].value > 0) {
@@ -6344,10 +6349,10 @@ wait:
 	batt_id = get_sram_prop_now(chip, FG_DATA_BATT_ID);
 	batt_id /= 1000;
 	if (fg_debug_mask & FG_STATUS)
-		pr_info("battery id = %dKOhms\n", batt_id);
+		pr_notice("battery id = %d\n", get_sram_prop_now(chip, FG_DATA_BATT_ID));
 
-	profile_node = of_batterydata_get_best_profile(batt_node, batt_id,
-							fg_batt_type);
+	profile_node = of_batterydata_get_best_profile(batt_node, "bms", fg_batt_type);
+
 	if (IS_ERR_OR_NULL(profile_node)) {
 		rc = PTR_ERR(profile_node);
 		if (rc == -EPROBE_DEFER) {
@@ -6392,7 +6397,7 @@ wait:
 					&chip->batt_max_voltage_uv);
 
 	if (rc)
-		pr_warn("couldn't find battery max voltage\n");
+		pr_err("couldn't find battery max voltage\n");
 
 	/*
 	 * Only configure from profile if fg-cc-cv-threshold-mv is not
@@ -6418,13 +6423,13 @@ wait:
 		goto no_profile;
 	}
 
-	rc = of_property_read_string(profile_node, "qcom,battery-type",
-					&batt_type_str);
-	if (rc) {
-		pr_err("Could not find battery data type: %d\n", rc);
-		rc = 0;
-		goto no_profile;
-	}
+    rc = of_property_read_string(profile_node, "qcom,battery-type", &batt_type_str);
+    if (rc) {
+        pr_notice("Could not find battery data type: %d\n", rc);
+        rc = 0;
+        goto no_profile;
+    }
+
 
 	if (!chip->batt_profile)
 		chip->batt_profile = devm_kzalloc(chip->dev,
@@ -6464,7 +6469,7 @@ wait:
 			goto done;
 		}
 	} else {
-		pr_info("Battery profile not same, clearing data\n");
+		pr_notice("Battery profile not same, clearing data\n");
 		clear_cycle_counter(chip);
 		chip->learning_data.learned_cc_uah = 0;
 	}
@@ -6473,15 +6478,15 @@ wait:
 		dump_sram(&chip->dump_sram);
 
 	if ((fg_debug_mask & FG_STATUS) && !vbat_in_range)
-		pr_info("Vbat out of range: v_current_pred: %d, v:%d\n",
+		pr_notice("Vbat out of range: v_current_pred: %d, v:%d\n",
 				fg_data[FG_DATA_CPRED_VOLTAGE].value,
 				fg_data[FG_DATA_VOLTAGE].value);
 
 	if ((fg_debug_mask & FG_STATUS) && fg_is_batt_empty(chip))
-		pr_info("battery empty\n");
+		pr_notice("battery empty\n");
 
 	if ((fg_debug_mask & FG_STATUS) && !profiles_same)
-		pr_info("profiles differ\n");
+		pr_notice("profiles differ\n");
 
 	if (fg_debug_mask & FG_STATUS) {
 		pr_info("Using new profile\n");
@@ -6539,10 +6544,10 @@ done:
 			chip->charging_disabled = false;
 	}
 
-	if (fg_batt_type)
-		chip->batt_type = fg_batt_type;
-	else
-		chip->batt_type = batt_type_str;
+    if (fg_batt_type)
+        chip->batt_type = fg_batt_type;
+    else
+        chip->batt_type = batt_type_str;
 
 	if (chip->first_profile_loaded && fg_reset_on_lockup) {
 		if (fg_debug_mask & FG_STATUS)
@@ -9161,7 +9166,7 @@ static int fg_restart_set(const char *val, const struct kernel_param *kp)
 	mutex_unlock(&chip->sysfs_restart_lock);
 
 	if (fg_debug_mask & FG_STATUS)
-		pr_info("fuel gauge restart initiated from sysfs...\n");
+		pr_notice("fuel gauge restart initiated from sysfs...\n");
 
 	schedule_work(&chip->sysfs_restart_work);
 	return 0;

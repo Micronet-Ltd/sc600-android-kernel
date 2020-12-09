@@ -168,6 +168,7 @@ static int qpnp_typec_read(struct qpnp_typec_chip *chip, u8 *val, u16 addr,
 	spin_lock_irqsave(&chip->rw_lock, flags);
 	rc = __qpnp_typec_read(chip, val, addr, count);
 	spin_unlock_irqrestore(&chip->rw_lock, flags);
+	pr_notice("0x%02x[%d, %d]\n", addr, rc, *val);
 
 	return rc;
 }
@@ -283,6 +284,7 @@ static int qpnp_typec_configure_ssmux(struct qpnp_typec_chip *chip,
 			break;
 		case CC_1:
 		case CC_2:
+		pr_debug("[oem][typec]:%s: %p %d %d\n", __func__,chip->ss_mux_vreg, chip->ssmux_gpio,chip->gpio_flag);
 			if (chip->ss_mux_vreg) {
 				rc = regulator_enable(chip->ss_mux_vreg);
 				if (rc) {

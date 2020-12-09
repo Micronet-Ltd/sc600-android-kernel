@@ -1877,4 +1877,19 @@ config SENSORS_ATK0110
 
 endif # ACPI
 
+config GPIO_WATCHDOG
+	tristate "Micronet host interface Watchdog"
+	depends on GPIOLIB && OF && ARCH_MSM8953
+	help
+	  This is the gpio based watchdog driver for the
+	  Micronet host interface in the Qualcomm MSM8953 platform.
+
+
+config PWR_LOSS_MONITOR
+	tristate "Power loss monitor"
+	depends on GPIOLIB && OF && ARCH_MSM8953
+	help
+	  This is the gpio based watchdog driver for the
+	  Micronet host interface in the Qualcomm MSM8953 platform.
+
 endif # HWMON

@@ -10,6 +10,8 @@
  * GNU General Public License for more details.
  *
  */
+#define pr_fmt(fmt) "%s %s: " fmt, KBUILD_MODNAME, __func__
+
 
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -63,7 +65,7 @@ static void scm_disable_sdi(void);
  * There is no API from TZ to re-enable the registers.
  * So the SDI cannot be re-enabled when it already by-passed.
  */
-static int download_mode = 1;
+static int download_mode = 0;
 #else
 static const int download_mode;
 #endif
@@ -75,7 +77,7 @@ static const int download_mode;
 #define KASLR_OFFSET_PROP "qcom,msm-imem-kaslr_offset"
 #endif
 
-static int in_panic;
+static int in_panic = 0;
 static int dload_type = SCM_DLOAD_FULLDUMP;
 static void *dload_mode_addr;
 static bool dload_mode_enabled;
@@ -360,9 +362,24 @@ static void msm_restart_prepare(const char *cmd)
 			}
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
+		//add by xxf
+		}else if (!strncmp(cmd,"userswitch",10)){
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_SWITCH_USER);
+			__raw_writel(0x77665506, restart_reason);
+		} else if (!strncmp(cmd,"testswitch",10)){
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_SWITCH_TEST);
+			__raw_writel(0x77665507, restart_reason);
+			//add by xxf
 		} else {
 			__raw_writel(0x77665501, restart_reason);
-		}
+		}else if (in_panic) {
+        		qpnp_pon_set_restart_reason(
+	            PON_RESTART_REASON_BOOTLOADER);
+        	    __raw_writel(0x77665500, restart_reason);
+                }
+
 	}
 
 	flush_cache_all();
@@ -416,6 +433,7 @@ static void do_msm_restart(enum reboot_mode reboot_mode, const char *cmd)
 
 	scm_disable_sdi();
 	halt_spmi_pmic_arbiter();
+	pr_notice("Bye bye...\n");
 	deassert_ps_hold();
 
 	msleep(10000);

@@ -11,6 +11,8 @@
  *
  */
 
+#define pr_fmt(fmt) "%s %s: " fmt, KBUILD_MODNAME, __func__
+
 #include <linux/debugfs.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -51,7 +53,7 @@
 
 #define MAX_BUF_SIZE  1024
 
-static int msm_pm_debug_mask = 1;
+static int msm_pm_debug_mask = 5;
 module_param_named(
 	debug_mask, msm_pm_debug_mask, int, 0664
 );

@@ -659,7 +659,7 @@ static int __init virtual_inputs_init(void)
 
     if (fixed_mode) {
         vdev->virtual_inputs_cradle_notifier.notifier_call = virtual_inputs_cradle_callback;
-        cradle_register_notifier(&vdev->virtual_inputs_cradle_notifier);
+ // BYU        cradle_register_notifier(&vdev->virtual_inputs_cradle_notifier);
     }
 
 	vdev->mdev = &vinputs_dev;

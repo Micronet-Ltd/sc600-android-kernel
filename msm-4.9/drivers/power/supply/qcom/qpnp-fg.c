@@ -6350,8 +6350,7 @@ wait:
 	batt_id /= 1000;
 	if (fg_debug_mask & FG_STATUS)
 		pr_notice("battery id = %d\n", get_sram_prop_now(chip, FG_DATA_BATT_ID));
-
-	profile_node = of_batterydata_get_best_profile(batt_node, "bms", fg_batt_type);
+    profile_node = of_batterydata_get_best_profile(batt_node, batt_id, fg_batt_type);
 
 	if (IS_ERR_OR_NULL(profile_node)) {
 		rc = PTR_ERR(profile_node);

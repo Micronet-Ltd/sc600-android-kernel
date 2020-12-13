@@ -700,7 +700,7 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
     if (err) {
         pr_err("failure to register cpu notifier [%d]\n", err);
     }
-    cradle_register_notifier(&pwrl->pwr_loss_mon_cradle_notifier);
+// BYU     cradle_register_notifier(&pwrl->pwr_loss_mon_cradle_notifier);
 
     do {
         pwrl->pctl = devm_pinctrl_get(dev);

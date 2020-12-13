@@ -2232,9 +2232,9 @@ static int _gpiod_direction_output_raw(struct gpio_desc *desc, int value)
 
 	/* GPIOs used for IRQs shall not be set as output */
 	if (test_bit(FLAG_USED_AS_IRQ, &desc->flags)) {
-		gpiod_err(desc,
+        gpiod_err(desc,
 			  "%s: %s tried to set a GPIO tied to an IRQ as output\n",
-			  __func__, (desc->chip->label)?desc->chip->label:"uncknown");
+                  __func__, (desc->gdev->label)?desc->gdev->label : "uncknown");
 		return -EIO;
 	}
 

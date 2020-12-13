@@ -409,11 +409,12 @@ static int __init virtual_j1708_init(void)
 	}
 
     ret = misc_register(&j1708_dev_out);
-	if(ret) {
-		pr_err("%s() Unable to register misc device j1708_dev_out\n", __func__);
-        misc_deregister(&j1708_dev_in);
-		return ret;
-	}
+
+// BYU 	if(ret) {
+// BYU 		pr_err("%s() Unable to register misc device j1708_dev_out\n", __func__);
+// BYU         misc_deregister(&j1708_dev_in);
+// BYU 		return ret;
+// BYU 	}
 
 	return 0;
 }*/
@@ -458,8 +459,8 @@ static int virtual_j1708_remove(struct platform_device *op)
 {
 	int ret = 0;
 
-  	ret = misc_deregister(&j1708_dev_in);
-    ret += misc_deregister(&j1708_dev_out);
+// BYU   	ret = misc_deregister(&j1708_dev_in);
+// BYU     ret += misc_deregister(&j1708_dev_out);
 
 	return ret;
 }  

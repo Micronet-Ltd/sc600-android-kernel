@@ -1846,8 +1846,9 @@ static int smbchg_set_usb_current_max(struct smbchg_chip *chip,
 			}
 			chip->usb_max_current_ma = 900;
 		}
+        current_ma = CURRENT_1500_MA;
+#ifdef BYU
 				if (chip->cfg_override_usb_current) {
-			current_ma = CURRENT_1500_MA;
 			pr_notice("%s:%d:current_ma = %d\n",__FUNCTION__,__LINE__,current_ma);
 			if (current_ma == CURRENT_1500_MA) {
 				/*
@@ -1870,6 +1871,7 @@ static int smbchg_set_usb_current_max(struct smbchg_chip *chip,
 			}
 
 		}
+#endif
 		break;
 	case POWER_SUPPLY_TYPE_USB_CDP:
 		if (current_ma < CURRENT_1500_MA) {

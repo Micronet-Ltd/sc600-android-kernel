@@ -23,7 +23,8 @@
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
 #include <linux/alarmtimer.h>
-#include <linux/qpnp/power-on.h>
+/* #include <linux/qpnp/power-on.h> */
+#include <linux/input/qpnp-power-on.h>
 
 /* RTC/ALARM Register offsets */
 #define REG_OFFSET_ALARM_RW	0x40

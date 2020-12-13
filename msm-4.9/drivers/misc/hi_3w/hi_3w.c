@@ -11,7 +11,7 @@
 //#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/switch.h>
+// BYU #include <linux/switch.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
@@ -20,7 +20,7 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/workqueue.h>
-#include <linux/wakelock.h>
+// BYU  #include <linux/wakelock.h>
 
 #include <linux/notifier.h>
 
@@ -39,7 +39,7 @@ struct hi_3w_device {
     int     hi_3w_clock_active_l;
     int     hi_3w_mosi_active_l;
     int     hi_3w_miso_active_l;
-    struct  wake_lock wlock;
+// BYU     struct  wake_lock wlock;
     struct  device*    pdev;
     struct  pinctrl *pctl;
     struct  hi_3w_attr attr_cmd2slv;
@@ -63,7 +63,7 @@ int hi_3w_tx_cmd(uint32_t *cmd, bool wait_for_response)
     uint8_t msg;
     int response_bit_cnt = 0;
     int cmd_bit_cnt = 0;    
-    uint32_t response;
+    uint32_t response = 0;
     int ack_val; 
     int initial_val;
     int err = GENERAL_ERROR;
@@ -269,7 +269,7 @@ static int hi_3w_probe(struct platform_device *pdev)
         mutex_init(&hi_dev->lock);
 
         //INIT_WORK(&hi_dev->work, dock_switch_work_func);
-        wake_lock_init(&hi_dev->wlock, WAKE_LOCK_SUSPEND, "hi_3w_wait_lock");
+// BYU         wake_lock_init(&hi_dev->wlock, WAKE_LOCK_SUSPEND, "hi_3w_wait_lock");
 
         //Init 3wire clock pin
         err = of_get_named_gpio_flags(np, "mcn,3w-clock-pin", 0, (enum of_gpio_flags *)&hi_dev->hi_3w_clock_active_l);
@@ -393,7 +393,7 @@ static int hi_3w_remove(struct platform_device *pdev)
     if (gpio_is_valid(hi_dev->hi_3w_miso_pin))
         devm_gpio_free(&pdev->dev, hi_dev->hi_3w_miso_pin);
 
-    wake_lock_destroy(&hi_dev->wlock);
+// BYU     wake_lock_destroy(&hi_dev->wlock);
 
     dev_set_drvdata(&pdev->dev, 0);
 

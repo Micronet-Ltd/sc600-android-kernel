@@ -11,7 +11,7 @@
 //#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
-// BYU #include <linux/switch.h>
+// BYU   #include <linux/switch.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
@@ -21,6 +21,7 @@
 #include <linux/irq.h>
 #include <linux/workqueue.h>
 // BYU  #include <linux/wakelock.h>
+#include <linux/pm_wakeup.h>
 
 #include <linux/notifier.h>
 
@@ -39,7 +40,7 @@ struct hi_3w_device {
     int     hi_3w_clock_active_l;
     int     hi_3w_mosi_active_l;
     int     hi_3w_miso_active_l;
-// BYU     struct  wake_lock wlock;
+    struct  wakeup_source wlock;
     struct  device*    pdev;
     struct  pinctrl *pctl;
     struct  hi_3w_attr attr_cmd2slv;
@@ -225,6 +226,8 @@ static int hi_3w_probe(struct platform_device *pdev)
     struct device_node *np;
     struct pinctrl_state *pctls;
 
+printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     np = dev->of_node;
     if (!np) {
         pr_err("failure to find device tree\n");
@@ -268,8 +271,10 @@ static int hi_3w_probe(struct platform_device *pdev)
 
         mutex_init(&hi_dev->lock);
 
-        //INIT_WORK(&hi_dev->work, dock_switch_work_func);
-// BYU         wake_lock_init(&hi_dev->wlock, WAKE_LOCK_SUSPEND, "hi_3w_wait_lock");
+//BYU        INIT_WORK(&hi_dev->work, dock_switch_work_func);
+
+//        wake_lock_init(&hi_dev->wlock, WAKE_LOCK_SUSPEND, "hi_3w_wait_lock");
+        wakeup_source_init(&hi_dev->wlock, "hi_3w_wait_lock");
 
         //Init 3wire clock pin
         err = of_get_named_gpio_flags(np, "mcn,3w-clock-pin", 0, (enum of_gpio_flags *)&hi_dev->hi_3w_clock_active_l);
@@ -362,6 +367,7 @@ static int hi_3w_probe(struct platform_device *pdev)
         hi_dev->attr_cmd2slv.attr.store = hi_3w_tx_store;
         sysfs_attr_init(&hi_dev->attr_cmd2slv.attr.attr);
         device_create_file(dev, &hi_dev->attr_cmd2slv.attr);
+printk("byu003 %s: %d  \n", __func__, __LINE__);
 
         return NO_ERROR;
 
@@ -375,6 +381,7 @@ static int hi_3w_probe(struct platform_device *pdev)
         devm_gpio_free(&pdev->dev, hi_dev->hi_3w_miso_pin);
     devm_kfree(dev, hi_dev);
  
+printk("byu003 %s: %d  \n", __func__, __LINE__);     
     pr_err("Error initializing\n");
 
     return err;
@@ -393,9 +400,9 @@ static int hi_3w_remove(struct platform_device *pdev)
     if (gpio_is_valid(hi_dev->hi_3w_miso_pin))
         devm_gpio_free(&pdev->dev, hi_dev->hi_3w_miso_pin);
 
-// BYU     wake_lock_destroy(&hi_dev->wlock);
+    wakeup_source_trash(&hi_dev->wlock);
 
-    dev_set_drvdata(&pdev->dev, 0);
+     dev_set_drvdata(&pdev->dev, 0);
 
     devm_kfree(&pdev->dev, hi_dev);
 

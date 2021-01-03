@@ -62,6 +62,9 @@ int proc_rf_kill_pin = -1;
 
 ssize_t proc_rfkillpin_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 {
+
+printk("byu003 %s: %d  \n", __func__, __LINE__);
+
 	if (size >= 1 && 0 == *ppos) {
 		if (gpio_is_valid(proc_rf_kill_pin)) {
 			if (0 == gpio_get_value(proc_rf_kill_pin))
@@ -95,6 +98,7 @@ static ssize_t rfkillpin_store(struct device *dev, struct device_attribute *attr
     int val;
     struct watch_dog_pin_info *wdi = dev_get_drvdata(dev);
 
+printk("byu003 %s: %d  \n", __func__, __LINE__);
     if (kstrtos32(buf, 10, &val))
         return -EINVAL;
 
@@ -115,6 +119,8 @@ static ssize_t rfkillpin_show(struct device *dev, struct device_attribute *attr,
 {
     struct watch_dog_pin_info *wdi = dev_get_drvdata(dev);
 
+printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     return sprintf(buf, "%d\n", wdi->rf_state);
 }
 
@@ -122,6 +128,8 @@ static ssize_t toggle_active_store(struct device *dev, struct device_attribute *
 {
     int val;
     struct watch_dog_pin_info *wdi = dev_get_drvdata(dev);
+
+printk("byu003 %s: %d  \n", __func__, __LINE__);
 
     pr_notice("%s\n", buf);
     if (kstrtos32(buf, 10, &val))
@@ -153,6 +161,8 @@ static ssize_t toggle_active_show(struct device *dev, struct device_attribute *a
 {
     struct watch_dog_pin_info *wdi = dev_get_drvdata(dev);
 
+printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     return sprintf(buf, "%d\n", (0 == wdi->suspend));
 }
 
@@ -161,6 +171,8 @@ static ssize_t rfkillpin_write(struct file *file, const char __user *buf, size_t
     int val;
     struct miscdevice *md =  file->private_data;
     struct watch_dog_pin_info *wdi = container_of(md, struct watch_dog_pin_info, mdev);
+
+printk("byu003 %s: %d  \n", __func__, __LINE__);
 
     if (1 == count) {
         val = ('0' == *buf)?0:1;
@@ -179,6 +191,8 @@ static ssize_t rfkillpin_read(struct file * file, char __user * buf, size_t coun
 {
     struct miscdevice *md =  file->private_data;
     struct watch_dog_pin_info *wdi = container_of(md, struct watch_dog_pin_info, mdev);
+
+printk("byu003 %s: %d  \n", __func__, __LINE__);
 
     if (0 == wdi->open) {
         return -EINVAL;
@@ -203,6 +217,8 @@ static int rfkillpin_open(struct inode *inode, struct file *file)
     struct miscdevice *md =  file->private_data;
 	struct watch_dog_pin_info *wdi = container_of(md, struct watch_dog_pin_info, mdev);
 
+printk("byu003 %s: %d  \n", __func__, __LINE__);
+
 	if(test_and_set_bit(1, &wdi->open))
 		return -EPERM;
 
@@ -213,6 +229,8 @@ static int rfkillpin_release(struct inode *inode, struct file *file)
 {
     struct miscdevice *md =  file->private_data;
     struct watch_dog_pin_info *wdi = container_of(md, struct watch_dog_pin_info, mdev);
+
+printk("byu003 %s: %d  \n", __func__, __LINE__);
 
 	clear_bit(1, &wdi->open);
 
@@ -232,10 +250,16 @@ static void watchdog_toggle_work(struct work_struct *work)
 	struct watch_dog_pin_info *inf = container_of(work, struct watch_dog_pin_info, toggle_work.work);
     unsigned long d;
 
+printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     if (0 != inf->suspend) {
         if (-1 == inf->suspend) {
+printk("byu003 %s: %d  \n", __func__, __LINE__);
+	
             d = 0;
         } else {
+printk("byu003 %s: %d  \n", __func__, __LINE__);
+	
             d = 1; //!inf->portable;
         }
         gpio_set_value(inf->toggle_pin, (int)d);
@@ -245,13 +269,18 @@ static void watchdog_toggle_work(struct work_struct *work)
     inf->state ^= 1; 
     d = (inf->state)?inf->high_delay:inf->low_delay;
     gpio_set_value(inf->toggle_pin, inf->state);
-
+printk("byu003 %s: %d  \n", __func__, __LINE__);
     schedule_delayed_work(&inf->toggle_work,msecs_to_jiffies(d));
+
+printk("byu003 %s: %d  msecs_to_jiffies(d)  \n", __func__, __LINE__);
+
 }
 
 static irqreturn_t port_det_handler(int irq, void *dev_id)
 {
 	struct watch_dog_pin_info *inf=dev_id;
+
+printk("byu003 %s: %d  \n", __func__, __LINE__);
 
     pr_notice("[%d]\n", gpio_get_value(inf->port_det_pin));
 	if(0==gpio_get_value(inf->port_det_pin))
@@ -271,13 +300,17 @@ static int watchdog_pin_probe(struct platform_device *op)
 	int irq;
     const char *comp;
 
+printk("byu003 %s: %d  \n", __func__, __LINE__);
+
 	if (!np) {
 		dev_err(dev, "Can not find config!\n");
+printk("byu003 %s: %d  \n", __func__, __LINE__);		
 		return -ENOENT;
 	}
 
 	inf = devm_kzalloc(dev, sizeof(*inf), GFP_KERNEL);
 	if (!inf) {
+printk("byu003 %s: %d  \n", __func__, __LINE__);	
 		dev_err(dev, "Memory exhausted!\n");
 		return -ENOMEM;
 	}
@@ -285,32 +318,38 @@ static int watchdog_pin_probe(struct platform_device *op)
 
     comp = of_get_property(np, "compatible", NULL);
     if (comp && 0 == strncmp("mcn,fixed-watchdog-pin", comp, sizeof("mcn,fixed-watchdog-pin") - sizeof(char))) {
+printk("byu003 %s: %d  \n", __func__, __LINE__);    
         inf->portable = 0;
     } else {
+printk("byu003 %s: %d  \n", __func__, __LINE__);    
         inf->portable = 1;
     }
 
     pr_notice("TAB8 %s \n", (1 == inf->portable)?"portable":"fixed");
-
+printk("byu003 %s: %d  \n", __func__, __LINE__);
     inf->pctl = devm_pinctrl_get(dev);
     if (IS_ERR(inf->pctl)) {
         if (PTR_ERR(inf->pctl) == -EPROBE_DEFER) {
+printk("byu003 %s: %d  \n", __func__, __LINE__);	
             dev_err(dev, "pin ctl critical error!\n");
             return -EPROBE_DEFER;
         }
 
-        pr_notice("%s: pin control isn't used\n", __func__);
+printk("byu003 %s: %d  \n", __func__, __LINE__);        
+	pr_notice("%s: pin control isn't used\n", __func__);
         inf->pctl = 0;
     }
 
     if (inf->pctl) {
         pctls = pinctrl_lookup_state(inf->pctl, "watchdog_pin_active");
         if (IS_ERR(pctls)) {
+printk("byu003 %s: %d  \n", __func__, __LINE__);
             dev_err(dev, "failure to get pinctrl active state\n");
             return PTR_ERR(pctls);
         }
         rc = pinctrl_select_state(inf->pctl, pctls);
         if (rc) {
+printk("byu003 %s: %d  \n", __func__, __LINE__);	
             dev_err(dev, "cannot set ts pinctrl active state\n");
             return rc;
         }
@@ -319,27 +358,33 @@ static int watchdog_pin_probe(struct platform_device *op)
 
 	inf->toggle_pin = of_get_named_gpio(np,"mcn,toggle-pin",0);
 	if(inf->toggle_pin < 0){
+printk("byu003 %s: %d  \n", __func__, __LINE__);	
 		dev_err(dev, "Memory exhausted!\n");
 		return -ENOMEM;		
 	}
 	rc=devm_gpio_request(dev,inf->toggle_pin, "watchdog_pin");
 	if(rc < 0){
+printk("byu003 %s: %d  \n", __func__, __LINE__);	
 		dev_err(dev, "toggle pin is busy!\n");
 		return -ENOMEM;			
 	}
 
 	inf->port_det_pin=
 		of_get_named_gpio(np,"mcn,port-det-pin",0);
+printk("byu003 %s: %d  \n", __func__, __LINE__);		
 	if(gpio_is_valid(inf->port_det_pin)){
+printk("byu003 %s: %d  \n", __func__, __LINE__);	
 		rc=devm_gpio_request(dev,inf->port_det_pin,"port_det");	
 		if(rc<0)
-			dev_err(dev, "port det pin is busy!\n");		
+			dev_err(dev, "port det pin is busy!\n");	
+printk("byu003 %s: %d  \n", __func__, __LINE__);				
 		gpio_direction_input(inf->port_det_pin);	
 	}
 	
 	inf->usb_switch_pin=
 		of_get_named_gpio(np,"mcn,usb-switch-pin",0);
 	if (gpio_is_valid(inf->usb_switch_pin) && gpio_is_valid(inf->port_det_pin)) {
+printk("byu003 %s: %d  \n", __func__, __LINE__);	
 		rc=devm_gpio_request(dev,inf->usb_switch_pin,"usb_switch");	
 		if(rc<0)
 			dev_err(dev, "usb switch pin is busy!\n");
@@ -452,6 +497,7 @@ static int watchdog_pin_probe(struct platform_device *op)
 
     proc_create("rfkillpin", S_IRUSR | S_IRGRP | S_IROTH, 0, &proc_rfkill_operations);
 
+printk("byu003 %s: %d FINISH RET 0 \n", __func__, __LINE__);
 	return 0;
 }
 
@@ -470,6 +516,8 @@ static int watchdog_pin_prepare(struct device *dev)
     unsigned long d;
 
     d = (unsigned long)ktime_to_ms(ktime_get());
+
+printk("byu003 %s: %d  \n", __func__, __LINE__);
 
     pr_notice("notify to mcu/cradle about suspend [%d] %lld\n", wdi->state, ktime_to_ms(ktime_get()));
 
@@ -509,6 +557,8 @@ static int watchdog_pin_suspend(struct device *dev)
 {
     struct watch_dog_pin_info *wdi = dev_get_drvdata(dev);
 
+printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     spin_lock_irqsave(&wdi->rfkillpin_lock, wdi->lock_flags);
     if (wdi->suspend != -1) {
         wdi->suspend = 1; 
@@ -522,6 +572,8 @@ static int watchdog_pin_suspend(struct device *dev)
 static int watchdog_pin_resume(struct device *dev)
 {
     struct watch_dog_pin_info *wdi = dev_get_drvdata(dev);
+
+printk("byu003 %s: %d  \n", __func__, __LINE__);
 
     if (gpio_is_valid(wdi->toggle_pin)) {
         pr_notice("restore toggling [%d] %lld\n", wdi->state, ktime_to_ms(ktime_get()));
@@ -549,6 +601,8 @@ static void watchdog_pin_complete(struct device *dev)
 {
     struct watch_dog_pin_info *wdi = dev_get_drvdata(dev);
 
+printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     if (wdi->suspend != -1) {
         wdi->suspend = 0; 
     }
@@ -563,6 +617,8 @@ static void watchdog_pin_complete(struct device *dev)
 static void watchdog_pin_shutdown(struct platform_device *dev)
 {
     struct watch_dog_pin_info *wdi = dev_get_drvdata(&dev->dev);
+
+printk("byu003 %s: %d  \n", __func__, __LINE__);
 
     cancel_delayed_work(&wdi->toggle_work);
 

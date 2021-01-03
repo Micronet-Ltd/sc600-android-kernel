@@ -30,6 +30,48 @@
 		bootargs = "core_ctl_disable_cpumask=0-7 kpti=0";
 	};
 
+
+
+/*   BYU003 FIXME	watchdogpin {
+		compatible = "mcn,fixed-watchdog-pin";
+		pinctrl-names = "watchdog_pin_active", "watchdog_pin_suspend";
+		pinctrl-0 = <&watchdog_pin_active>;		
+		pinctrl-1 = <&watchdog_pin_suspend>;
+		mcn,toggle-pin = <&tlmm 33 0>;
+		mcn,rf-kill-pin = <&tlmm 63 0>;
+		mcn,high-delay=<1000>;
+		mcn,low-delay=<1000>;
+		status = "okay";
+	};
+*/	
+	watchdogpin {
+		compatible = "mcn,watchdog-pin";
+		pinctrl-names = "watchdog_pin_active", "watchdog_pin_suspend";
+		pinctrl-0 = <&watchdog_pin_active>;		
+		pinctrl-1 = <&watchdog_pin_suspend>;
+		mcn,toggle-pin = <&tlmm 33 0>;
+		mcn,suspend-ind-pin = <&tlmm 22 0>; 
+		mcn,rf-kill-pin = <&tlmm 63 0>;
+		mcn,high-delay=<1000>;
+		mcn,low-delay=<1000>;
+		status = "okay";
+	};
+
+
+/*   BYU003 FIXME */
+	hi3w {
+		compatible = "mcn,hi-3w";
+		pinctrl-names = "hi_3w_pins_active", "hi_3w_pin_suspend";
+		pinctrl-0 = <&hi_3w_pins_active>;
+		pinctrl-1 = <&hi_3w_pin_suspend>;
+		mcn,3w-clock-pin = <&tlmm 13 GPIO_ACTIVE_LOW>;
+		mcn,3w-miso-pin = <&tlmm 90 GPIO_ACTIVE_LOW>;
+		mcn,3w-mosi-pin = <&tlmm 22 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
+ /* BYU003 FIXME */
+
+
 	vendor: vendor {
 		#address-cells = <1>;
 		#size-cells = <1>;
@@ -621,7 +663,7 @@
 		status = "disabled";
 	};
 	
-	blsp1_serial1: serial@78b0000 {
+/* BYU FIXME	blsp1_serial1: serial@78b0000 {
 		compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
 		reg = <0x78b0000 0x200>;
 		interrupts = <0 108 0>;
@@ -633,6 +675,7 @@
 		pinctrl-1 = <&uart4_sleep>;
 		status = "ok";
 	};
+ BYU FIXME */
 
 	spmi_bus: qcom,spmi@200f000 {
 		compatible = "qcom,spmi-pmic-arb";

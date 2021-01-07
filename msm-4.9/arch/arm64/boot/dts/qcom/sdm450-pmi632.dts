@@ -23,3 +23,17 @@
 	qcom,pmic-id = <0x010016 0x25 0x0 0x0>;
 	qcom,pmic-name = "PMI632";
 };
+
+&soc {
+	watchdogpin {
+		compatible = "mcn,fixed-watchdog-pin";
+		pinctrl-names = "watchdog_pin_active", "watchdog_pin_suspend";
+		pinctrl-0 = <&watchdog_pin_active>;		
+		pinctrl-1 = <&watchdog_pin_suspend>;
+		mcn,toggle-pin = <&tlmm 33 0>;
+		/*mcn,rf-kill-pin = <&tlmm 63 0>;*/
+		mcn,high-delay=<1000>;
+		mcn,low-delay=<1000>;
+		status = "okay";
+	};
+};

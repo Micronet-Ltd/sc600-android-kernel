@@ -2111,16 +2111,18 @@
 				input-disable;
 			};
 		};
-		
+/* cradle connectivety */
 		watchdog_pin {
 			watchdog_pin_active: watchdog_pin_active {
 				mux {
-					pins = "gpio33", "gpio63";
+					/*pins = "gpio6", "gpio63";*/
+					pins = "gpio33";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio33", "gpio63";
+					/*pins = "gpio6", "gpio63";*/
+					pins = "gpio33";
 					drive-strength = <2>;
 					bias-disable;
 				};
@@ -2128,49 +2130,47 @@
 
 			watchdog_pin_suspend: watchdog_pin_suspend {
 				mux {
-					pins = "gpio33", "gpio63";
+					/*pins = "gpio6", "gpio63";*/
+					pins = "gpio33";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio33", "gpio63";
+					/*pins = "gpio6", "gpio63";*/
+					pins = "gpio33";
 					drive-strength = <2>;
 					bias-disable;
 				};
 			};
 		};
-		
-/* BYU FIXME		pwr_loss_mon {
-			pwr_loss_mon_active: pwr_loss_mon_active {
+/*
+		dock {
+			dock_pins_active: dock_pins_active {
 				mux {
-					pins = "gpio98";
+					pins = "gpio12", "gpio36", "gpio47", "gpio97";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio98";
+					pins = "gpio12", "gpio36", "gpio47", "gpio97";
 					drive-strength = <2>;
 					bias-pull-down;
 				};
 			};
 
-			pwr_loss_mon_suspend: pwr_loss_mon_suspend {
+			dock_pin_suspend: dock_pin_suspend {
 				mux {
-					pins = "gpio98";
+					pins = "gpio12", "gpio36", "gpio47", "gpio97";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio98";
+					pins = "gpio12", "gpio36", "gpio47", "gpio97";
 					drive-strength = <2>;
 					bias-pull-down;
 				};
 			};
 		};
-
-BYU FIXME */		
-		
-
 		hi_3w {
 			hi_3w_pins_active: hi_3w_pins_active {
 				mux {
@@ -2198,5 +2198,60 @@ BYU FIXME */
 				};
 			};
 		};
+		dev_info {
+			dev_info_active: dev_info_active {
+				mux {
+					pins = "gpio94", "gpio95", "gpio96";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio94", "gpio95", "gpio96";
+					drive-strength = <2>;
+					bias-disable;
+				};
+			};
+
+			dev_info_suspend: dev_info_suspend {
+				mux {
+					pins = "gpio94", "gpio95", "gpio96";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio94", "gpio95", "gpio96";
+					drive-strength = <2>;
+					bias-disable;
+				};
+			};
+		};
+		pwr_loss_mon {
+			pwr_loss_mon_active: pwr_loss_mon_active {
+				mux {
+					pins = "gpio98";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio98";
+					drive-strength = <2>;
+					bias-pull-down;
+				};
+			};
+
+			pwr_loss_mon_suspend: pwr_loss_mon_suspend {
+				mux {
+					pins = "gpio98";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio98";
+					drive-strength = <2>;
+					bias-pull-down;
+				};
+			};
+		};
+*/
 	};
 };

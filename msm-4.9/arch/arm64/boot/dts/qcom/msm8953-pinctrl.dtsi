@@ -2174,12 +2174,12 @@
 		hi_3w {
 			hi_3w_pins_active: hi_3w_pins_active {
 				mux {
-					pins = "gpio7", "gpio13", "gpio22";
+					pins = "gpio90", "gpio13", "gpio22";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio7", "gpio13", "gpio22";
+					pins = "gpio90", "gpio13", "gpio22";
 					drive-strength = <16>;
 					bias-pull-up;
 				};
@@ -2187,12 +2187,12 @@
 
 			hi_3w_pin_suspend: hi_3w_pin_suspend {
 				mux {
-					pins = "gpio7", "gpio13", "gpio22";
+					pins = "gpio90", "gpio13", "gpio22";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio7", "gpio13", "gpio22";
+					pins = "gpio90", "gpio13", "gpio22";
 					drive-strength = <2>;
 					bias-pull-down;
 				};
@@ -2228,12 +2228,12 @@
 		pwr_loss_mon {
 			pwr_loss_mon_active: pwr_loss_mon_active {
 				mux {
-					pins = "gpio46";
+					pins = "gpio98";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio46";
+					pins = "gpio98";
 					drive-strength = <2>;
 					bias-pull-down;
 				};
@@ -2241,12 +2241,12 @@
 
 			pwr_loss_mon_suspend: pwr_loss_mon_suspend {
 				mux {
-					pins = "gpio46";
+					pins = "gpio98";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio46";
+					pins = "gpio98";
 					drive-strength = <2>;
 					bias-pull-down;
 				};

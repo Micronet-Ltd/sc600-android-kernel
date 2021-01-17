@@ -1,0 +1,5 @@
+config HI_3W
+    tristate "3wire host interface"
+    depends on GPIOLIB
+    help
+      This driver provides a host interface for other drivers to send commands to MCU

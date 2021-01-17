@@ -171,9 +171,8 @@ obj-$(CONFIG_SENSORS_QPNP_ADC_CURRENT)	+= qpnp-adc-current.o qpnp-adc-common.o
 
 obj-$(CONFIG_PMBUS)		+= pmbus/
 obj-$(CONFIG_GPIO_WATCHDOG) += watch_dog_gpio.o
+obj-$(CONFIG_PWR_LOSS_MONITOR) += pwr_loss_mon.o
 
 ccflags-$(CONFIG_HWMON_DEBUG_CHIP) := -DDEBUG
-obj-$(CONFIG_GPIO_WATCHDOG) += watch_dog_gpio.o
-obj-$(CONFIG_PWR_LOSS_MONITOR) += pwr_loss_mon.o
 
 

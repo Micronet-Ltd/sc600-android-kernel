@@ -36,4 +36,18 @@
 		mcn,low-delay=<1000>;
 		status = "okay";
 	};
+	hi3w {
+		compatible = "mcn,hi-3w";
+		pinctrl-names = "hi_3w_pins_active", "hi_3w_pin_suspend";
+		pinctrl-0 = <&hi_3w_pins_active>;
+		pinctrl-1 = <&hi_3w_pin_suspend>;
+		mcn,3w-clock-pin = <&tlmm 13 GPIO_ACTIVE_LOW>;
+		mcn,3w-miso-pin = <&tlmm 90 GPIO_ACTIVE_LOW>;
+		mcn,3w-mosi-pin = <&tlmm 22 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
+};
+
+&blsp1_serial1 {
+	status = "disabled";
 };

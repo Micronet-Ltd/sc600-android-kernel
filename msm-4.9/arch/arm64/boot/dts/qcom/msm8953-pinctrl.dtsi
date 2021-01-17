@@ -2143,7 +2143,6 @@
 				};
 			};
 		};
-/*
 		dock {
 			dock_pins_active: dock_pins_active {
 				mux {
@@ -2198,6 +2197,7 @@
 				};
 			};
 		};
+/*
 		dev_info {
 			dev_info_active: dev_info_active {
 				mux {

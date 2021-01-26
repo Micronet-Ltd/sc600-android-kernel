@@ -1,0 +1,62 @@
+/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+qcom,c801_hwe30100100_2p_4v2_6600mah_10k {
+	/* #3794992_Lovdream_C801_HE_6600mAH_FG_averaged_MasterSlave_Jan9th2019*/
+	qcom,max-voltage-uv = <4200000>;
+	qcom,fastchg-current-ma = <2650>;
+	qcom,fg-cc-cv-threshold-mv = <4190>;
+	qcom,nom-batt-capacity-mah = <6600>;
+	qcom,batt-id-kohm = <10>;
+	qcom,battery-beta = <3440>;
+	qcom,battery-type = "c801_hwe30100100_2p_4v2_6600mah_10k";
+	qcom,chg-rslow-comp-c1 = <2861349>;
+	qcom,chg-rslow-comp-c2 = <3721355>;
+	qcom,chg-rs-to-rslow = <324284>;
+	qcom,chg-rslow-comp-thr = <0x9D>;
+	qcom,checksum = <0xC1C7>;
+	qcom,gui-version = "PMI8950GUI - 2.0.0.16";
+	qcom,fg-profile-data = [
+		 98 83 AB 6D 
+		 C4 72 E8 5E 
+		 28 83 BB 78 
+		 8F 85 7D 81 
+		 CC 81 3C 9A 
+		 5C BC 33 C8 
+		 6C 16 C0 83 
+		 34 75 3F 79 
+		 A0 6D 26 83 
+		 36 7A 16 8C 
+		 0F 88 18 82 
+		 89 9A 05 BE 
+		 B9 CB 68 10 
+		 65 1A 05 59 
+		 FB 6A EE FA 
+		 8F 45 C2 19 
+		 EB 40 00 00 
+		 29 4D B6 3C 
+		 FE 4A 00 00 
+		 00 00 00 00 
+		 00 00 00 00 
+		 22 62 04 61 
+		 67 5B BD 83 
+		 88 75 C1 68 
+		 3E 82 6C 91 
+		 42 75 76 68 
+		 7B 96 8E CA 
+		 0B FA 58 E3 
+		 54 A0 71 0C 
+		 28 00 FF 36 
+		 F0 11 30 03 
+		 00 00 00 0C 
+	];
+};

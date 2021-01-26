@@ -51,3 +51,14 @@
 &blsp1_serial1 {
 	status = "disabled";
 };
+
+/*
+&pm8953_rtc {
+	qcom,qpnp-rtc-write = <1>;
+	qcom,qpnp-rtc-alarm-pwrup = <1>;
+}
+*/
+
+&pmi632_charger {
+	qcom,auto-recharge-soc = <70>;
+};

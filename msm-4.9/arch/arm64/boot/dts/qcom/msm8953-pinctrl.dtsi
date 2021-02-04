@@ -2146,12 +2146,14 @@
 		dock {
 			dock_pins_active: dock_pins_active {
 				mux {
-					pins = "gpio12", "gpio36", "gpio47", "gpio97";
+					/*pins = "gpio12", "gpio36", "gpio47", "gpio97";*/
+					pins = "gpio36", "gpio97";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio12", "gpio36", "gpio47", "gpio97";
+					/*pins = "gpio12", "gpio36", "gpio47", "gpio97";*/
+					pins = "gpio36", "gpio97";
 					drive-strength = <2>;
 					bias-pull-down;
 				};
@@ -2159,12 +2161,14 @@
 
 			dock_pin_suspend: dock_pin_suspend {
 				mux {
-					pins = "gpio12", "gpio36", "gpio47", "gpio97";
+					/*pins = "gpio12", "gpio36", "gpio47", "gpio97";*/
+					pins = "gpio36", "gpio97";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio12", "gpio36", "gpio47", "gpio97";
+					/*pins = "gpio12", "gpio36", "gpio47", "gpio97";*/
+					pins = "gpio36", "gpio97";
 					drive-strength = <2>;
 					bias-pull-down;
 				};

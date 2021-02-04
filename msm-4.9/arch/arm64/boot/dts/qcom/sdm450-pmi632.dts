@@ -36,6 +36,21 @@
 		mcn,low-delay=<1000>;
 		status = "okay";
 	};
+	dock {
+		compatible = "mcn,fixed-dock-switch";
+		pinctrl-names = "dock_pins_active", "dock_pin_suspend";
+		pinctrl-0 = <&dock_pins_active>;
+		pinctrl-1 = <&dock_pin_suspend>;
+		mcn,dock-pin = <&tlmm 36 GPIO_ACTIVE_LOW>;
+		/* usb switch hw controlled by vbus_cradle signal */
+		/*mcn,usb-switch-pin = <&tlmm 12 GPIO_ACTIVE_HIGH>;*/
+		/*mcn,otg-en-pin = <&tlmm 97 GPIO_ACTIVE_HIGH>;*/
+		/*mcn,mic-switch-pin = <&tlmm 47 GPIO_ACTIVE_HIGH>;*/
+		interrupt-names = "cradle-detect";
+		interrupt-parent = <&tlmm>;
+		interrupts = <&tlmm 36 0>;
+		status = "okay";
+	};
 	hi3w {
 		compatible = "mcn,hi-3w";
 		pinctrl-names = "hi_3w_pins_active", "hi_3w_pin_suspend";

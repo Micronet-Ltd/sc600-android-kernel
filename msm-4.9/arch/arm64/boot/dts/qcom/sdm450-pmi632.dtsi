@@ -91,12 +91,13 @@
 	status = "ok";
 };
 
+/*
 &soc {
 	gpio-leds {
         compatible = "gpio-leds";
         status = "ok";
-        // pinctrl-names = "default";
-        // pinctrl-0 = <&gpio_led_off>;
+        / * pinctrl-names = "default";
+        pinctrl-0 = <&gpio_led_off>; * /
         red {
             gpios = <&tlmm 36 0>;
             label = "red";
@@ -106,6 +107,8 @@
         };
     };
 };
+*/
+
 &thermal_zones {
 	pmi-vbat-lvl0 {
 		cooling-maps {

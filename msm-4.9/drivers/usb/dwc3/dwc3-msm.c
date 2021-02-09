@@ -11,6 +11,8 @@
  *
  */
 
+#define pr_fmt(fmt) "%s %s: " fmt, KBUILD_MODNAME, __func__
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -1849,8 +1851,8 @@ static void dwc3_msm_notify_event(struct dwc3 *dwc, unsigned int event,
 
 	switch (event) {
 	case DWC3_CONTROLLER_ERROR_EVENT:
-		dev_info(mdwc->dev,
-			"DWC3_CONTROLLER_ERROR_EVENT received, irq cnt %lu\n",
+		dev_notice(mdwc->dev,
+			"DWC3_CONTROLLER_ERROR_EVENT, irq cnt %lu\n",
 			dwc->irq_cnt);
 
 		dwc3_gadget_disable_irq(dwc);
@@ -1864,13 +1866,13 @@ static void dwc3_msm_notify_event(struct dwc3 *dwc, unsigned int event,
 		schedule_work(&mdwc->restart_usb_work);
 		break;
 	case DWC3_CONTROLLER_RESET_EVENT:
-		dev_dbg(mdwc->dev, "DWC3_CONTROLLER_RESET_EVENT received\n");
+		dev_notice(mdwc->dev, "DWC3_CONTROLLER_RESET_EVENT\n");
 		/* HS & SSPHYs get reset as part of core soft reset */
 		dwc3_msm_qscratch_reg_init(mdwc);
 		break;
 	case DWC3_CONTROLLER_POST_RESET_EVENT:
-		dev_dbg(mdwc->dev,
-				"DWC3_CONTROLLER_POST_RESET_EVENT received\n");
+		dev_notice(mdwc->dev,
+				"DWC3_CONTROLLER_POST_RESET_EVENT\n");
 
 		/*
 		 * Below sequence is used when controller is working without
@@ -1904,7 +1906,7 @@ static void dwc3_msm_notify_event(struct dwc3 *dwc, unsigned int event,
 		dwc->tx_fifo_size = mdwc->tx_fifo_size;
 		break;
 	case DWC3_CONTROLLER_CONNDONE_EVENT:
-		dev_dbg(mdwc->dev, "DWC3_CONTROLLER_CONNDONE_EVENT received\n");
+		dev_notice(mdwc->dev, "DWC3_CONTROLLER_CONNDONE_EVENT\n");
 		/*
 		 * Add power event if the dbm indicates coming out of L1 by
 		 * interrupt
@@ -1917,18 +1919,18 @@ static void dwc3_msm_notify_event(struct dwc3 *dwc, unsigned int event,
 		atomic_set(&dwc->in_lpm, 0);
 		break;
 	case DWC3_CONTROLLER_NOTIFY_OTG_EVENT:
-		dev_dbg(mdwc->dev, "DWC3_CONTROLLER_NOTIFY_OTG_EVENT received\n");
+		dev_notice(mdwc->dev, "DWC3_CONTROLLER_NOTIFY_OTG_EVENT\n");
 		if (dwc->enable_bus_suspend) {
 			mdwc->suspend = dwc->b_suspend;
 			queue_work(mdwc->dwc3_wq, &mdwc->resume_work);
 		}
 		break;
 	case DWC3_CONTROLLER_SET_CURRENT_DRAW_EVENT:
-		dev_dbg(mdwc->dev, "DWC3_CONTROLLER_SET_CURRENT_DRAW_EVENT received\n");
+		dev_notice(mdwc->dev, "DWC3_CONTROLLER_SET_CURRENT_DRAW_EVENT [%u mA]\n", dwc->vbus_draw);
 		schedule_work(&mdwc->vbus_draw_work);
 		break;
 	case DWC3_CONTROLLER_RESTART_USB_SESSION:
-		dev_dbg(mdwc->dev, "DWC3_CONTROLLER_RESTART_USB_SESSION received\n");
+		dev_notice(mdwc->dev, "DWC3_CONTROLLER_RESTART_USB_SESSION\n");
 		schedule_work(&mdwc->restart_usb_work);
 		break;
 	case DWC3_GSI_EVT_BUF_ALLOC:
@@ -2595,7 +2597,7 @@ static int dwc3_msm_resume(struct dwc3_msm *mdwc)
 		mdwc->lpm_flags &= ~MDWC3_ASYNC_IRQ_WAKE_CAPABILITY;
 	}
 
-	dev_info(mdwc->dev, "DWC3 exited from low power mode\n");
+	dev_notice(mdwc->dev, "DWC3 exited from low power mode\n");
 
 	/* Enable core irq */
 	if (dwc->irq)
@@ -2628,26 +2630,26 @@ static void dwc3_ext_event_notify(struct dwc3_msm *mdwc)
 	flush_delayed_work(&mdwc->sm_work);
 
 	if (mdwc->id_state == DWC3_ID_FLOAT) {
-		dev_dbg(mdwc->dev, "XCVR: ID set\n");
+        dev_notice(mdwc->dev, "otg id is float\n");
 		set_bit(ID, &mdwc->inputs);
 	} else {
-		dev_dbg(mdwc->dev, "XCVR: ID clear\n");
+        dev_notice(mdwc->dev, "otg id is ground\n");
 		clear_bit(ID, &mdwc->inputs);
 	}
 
 	if (mdwc->vbus_active && !mdwc->in_restart) {
-		dev_dbg(mdwc->dev, "XCVR: BSV set\n");
+        dev_notice(mdwc->dev, "b session is valid\n");
 		set_bit(B_SESS_VLD, &mdwc->inputs);
 	} else {
-		dev_dbg(mdwc->dev, "XCVR: BSV clear\n");
+        dev_notice(mdwc->dev, "b session is invalid\n");
 		clear_bit(B_SESS_VLD, &mdwc->inputs);
 	}
 
 	if (mdwc->suspend) {
-		dev_dbg(mdwc->dev, "XCVR: SUSP set\n");
+        dev_notice(mdwc->dev, "set bus suspend\n");
 		set_bit(B_SUSPEND, &mdwc->inputs);
 	} else {
-		dev_dbg(mdwc->dev, "XCVR: SUSP clear\n");
+        dev_notice(mdwc->dev, "clear bus suspend\n");
 		clear_bit(B_SUSPEND, &mdwc->inputs);
 	}
 
@@ -2662,10 +2664,21 @@ static void dwc3_resume_work(struct work_struct *w)
 	unsigned int extcon_id;
 	struct extcon_dev *edev = NULL;
 	int ret = 0;
+    union power_supply_propval pval = {0, };
+    struct power_supply	*ext_psy;
 
 	dev_dbg(mdwc->dev, "%s: dwc3 resume work\n", __func__);
 
-	if (mdwc->vbus_active && !mdwc->in_restart) {
+    pval.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+    ext_psy = power_supply_get_by_name("pc_port");
+    if (ext_psy) {
+        ret = power_supply_get_property(ext_psy, POWER_SUPPLY_PROP_SCOPE, &pval);
+        if (POWER_SUPPLY_SCOPE_SYSTEM != pval.intval) {
+            pval.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+        }
+    }
+
+    if (POWER_SUPPLY_SCOPE_SYSTEM != pval.intval && mdwc->vbus_active && !mdwc->in_restart) {
 		edev = mdwc->extcon_vbus;
 		extcon_id = EXTCON_USB;
 	} else if (mdwc->id_state == DWC3_ID_GROUND) {
@@ -2957,7 +2970,7 @@ static int dwc3_msm_id_notifier(struct notifier_block *nb,
 
 	id = event ? DWC3_ID_GROUND : DWC3_ID_FLOAT;
 
-	dev_dbg(mdwc->dev, "host:%ld (id:%d) event received\n", event, id);
+	dev_notice(mdwc->dev, "%s: (%ld), id is %s\n", __func__, event, (DWC3_ID_GROUND == id)?"ground":"float");
 
 	if (mdwc->id_state != id) {
 		mdwc->id_state = id;
@@ -3000,7 +3013,7 @@ static int dwc3_msm_vbus_notifier(struct notifier_block *nb,
 	struct dwc3_msm *mdwc = container_of(nb, struct dwc3_msm, vbus_nb);
 	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
 
-	dev_dbg(mdwc->dev, "vbus:%ld event received\n", event);
+	dev_notice(mdwc->dev, "%s: (%ld)\n", __func__, event);
 
 	if (mdwc->vbus_active == event)
 		return NOTIFY_DONE;
@@ -3028,7 +3041,7 @@ static int dwc3_msm_eud_notifier(struct notifier_block *nb,
 	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
 
 	dbg_event(0xFF, "EUD_NB", event);
-	dev_dbg(mdwc->dev, "eud:%ld event received\n", event);
+	dev_notice(mdwc->dev, "%s: (%ld)\n", __func__, event);
 	if (mdwc->vbus_active == event)
 		return NOTIFY_DONE;
 
@@ -3861,7 +3874,7 @@ static int dwc3_msm_host_notifier(struct notifier_block *nb,
 				max_power = udev->actconfig->desc.bMaxPower * 8;
 			else
 				max_power = udev->actconfig->desc.bMaxPower * 2;
-			dev_dbg(mdwc->dev, "%s configured bMaxPower:%d (mA)\n",
+			dev_notice(mdwc->dev, "%s configured bMaxPower:%d (mA)\n",
 					dev_name(&udev->dev), max_power);
 
 			/* inform PMIC of max power so it can optimize boost */
@@ -3938,6 +3951,19 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 {
 	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
 	int ret = 0;
+    union power_supply_propval pval = {0, };
+    struct power_supply	*ext_psy;
+
+    pval.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+    ext_psy = power_supply_get_by_name("pc_port");
+    if (ext_psy) {
+        power_supply_get_property(ext_psy, POWER_SUPPLY_PROP_SCOPE, &pval);
+        if (POWER_SUPPLY_SCOPE_SYSTEM != pval.intval) {
+            pval.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+        } else {
+            dev_notice(mdwc->dev, "vbus supplied by power board\n");
+        }
+    }
 
 	/*
 	 * The vbus_reg pointer could have multiple values
@@ -3945,8 +3971,9 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 	 * IS_ERR: regulator could not be obtained, so skip using it
 	 * Valid pointer otherwise
 	 */
-	if (!mdwc->vbus_reg && (!mdwc->type_c ||
+	if (POWER_SUPPLY_SCOPE_SYSTEM != pval.intval && !mdwc->vbus_reg && (!mdwc->type_c ||
 				(mdwc->type_c && !mdwc->no_vbus_vote_type_c))) {
+        dev_notice(mdwc->dev, "supply vbus\n");
 		mdwc->vbus_reg = devm_regulator_get_optional(mdwc->dev,
 					"vbus_dwc3");
 		if (IS_ERR(mdwc->vbus_reg) &&
@@ -3958,7 +3985,7 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 	}
 
 	if (on) {
-		dev_dbg(mdwc->dev, "%s: turn on host\n", __func__);
+		dev_notice(mdwc->dev, "turn on host\n");
 
 		mdwc->hs_phy->flags |= PHY_HOST_MODE;
 		pm_runtime_get_sync(mdwc->dev);
@@ -4052,7 +4079,7 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 		schedule_delayed_work(&mdwc->perf_vote_work,
 				msecs_to_jiffies(1000 * PM_QOS_SAMPLE_SEC));
 	} else {
-		dev_dbg(mdwc->dev, "%s: turn off host\n", __func__);
+		dev_notice(mdwc->dev, "turn off host\n");
 
 		usb_unregister_atomic_notify(&mdwc->usbdev_nb);
 		if (!IS_ERR_OR_NULL(mdwc->vbus_reg))
@@ -4127,7 +4154,7 @@ static int dwc3_otg_start_peripheral(struct dwc3_msm *mdwc, int on)
 		atomic_read(&mdwc->dev->power.usage_count));
 
 	if (on) {
-		dev_dbg(mdwc->dev, "%s: turn on gadget %s\n",
+		dev_notice(mdwc->dev, "%s: turn on gadget %s\n",
 					__func__, dwc->gadget.name);
 
 		dwc3_override_vbus_status(mdwc, true);
@@ -4154,7 +4181,7 @@ static int dwc3_otg_start_peripheral(struct dwc3_msm *mdwc, int on)
 		schedule_delayed_work(&mdwc->perf_vote_work,
 				msecs_to_jiffies(1000 * PM_QOS_SAMPLE_SEC));
 	} else {
-		dev_dbg(mdwc->dev, "%s: turn off gadget %s\n",
+		dev_notice(mdwc->dev, "%s: turn off gadget %s\n",
 					__func__, dwc->gadget.name);
 		cancel_delayed_work_sync(&mdwc->perf_vote_work);
 		msm_dwc3_perf_vote_update(mdwc, false);
@@ -4193,6 +4220,8 @@ static int dwc3_notify_pd_status(struct notifier_block *nb,
 		dwc->gadget.self_powered = val.intval;
 	else
 		dwc->gadget.self_powered = 0;
+
+    dev_notice(mdwc->dev, "%s: %s-powered\n", __func__, dwc->gadget.self_powered?"self":"bus");
 
 	return ret;
 }
@@ -4377,7 +4406,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			work = 1;
 		} else {
 			dwc3_msm_gadget_vbus_draw(mdwc, 0);
-			dev_dbg(mdwc->dev, "Cable disconnected\n");
+			dev_notice(mdwc->dev, "Cable disconnected\n");
 		}
 		break;
 

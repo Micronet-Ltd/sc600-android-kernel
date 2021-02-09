@@ -110,6 +110,7 @@ struct dock_switch_device {
     struct  notifier_block dock_switch_vbus_notifier;
     enum    e_dock_type dock_type;
     struct  power_supply *usb_psy;
+    struct  power_supply *otg_psy;
     int 	ampl_enable;
     struct  pinctrl *pctl;
     struct  dock_switch_attr attr_outs_mask_state;
@@ -669,6 +670,14 @@ static void dock_switch_work_func_fix(struct work_struct *work)
 
         return;
     }
+    if (!ds->otg_psy) {
+        pr_notice("otg power supply not ready %lld\n", ktime_to_ms(ktime_get()));
+        ds->otg_psy = power_supply_get_by_name("pc_port");
+        msleep(200);
+        schedule_work(&ds->work);
+
+        return;
+    }
 
     // Vladimir:
     // PATERN_INTERIM should be replaced by correct
@@ -693,8 +702,8 @@ static void dock_switch_work_func_fix(struct work_struct *work)
         }
 
         allow_ufp = 0; 
-        //prop.intval = 0x0;
-        //power_supply_set_usb_otg(ds->usb_psy, prop.intval);
+        prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+        power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
         fd = sys_open("/proc/mcu_version", O_WRONLY, 0);
         if (fd >= 0) {
             sprintf(ver, "unknown");

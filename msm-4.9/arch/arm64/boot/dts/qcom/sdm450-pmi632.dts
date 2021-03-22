@@ -23,3 +23,57 @@
 	qcom,pmic-id = <0x010016 0x25 0x0 0x0>;
 	qcom,pmic-name = "PMI632";
 };
+
+&soc {
+	watchdogpin {
+		compatible = "mcn,fixed-watchdog-pin";
+		pinctrl-names = "watchdog_pin_active", "watchdog_pin_suspend";
+		pinctrl-0 = <&watchdog_pin_active>;		
+		pinctrl-1 = <&watchdog_pin_suspend>;
+		mcn,toggle-pin = <&tlmm 33 0>;
+		/*mcn,rf-kill-pin = <&tlmm 63 0>;*/
+		mcn,high-delay=<1000>;
+		mcn,low-delay=<1000>;
+		status = "okay";
+	};
+	dock {
+		compatible = "mcn,fixed-dock-switch";
+		pinctrl-names = "dock_pins_active", "dock_pin_suspend";
+		pinctrl-0 = <&dock_pins_active>;
+		pinctrl-1 = <&dock_pin_suspend>;
+		mcn,dock-pin = <&tlmm 36 GPIO_ACTIVE_LOW>;
+		/* usb switch hw controlled by vbus_cradle signal */
+		/*mcn,usb-switch-pin = <&tlmm 12 GPIO_ACTIVE_HIGH>;*/
+		/*mcn,otg-en-pin = <&tlmm 97 GPIO_ACTIVE_HIGH>;*/
+		/*mcn,mic-switch-pin = <&tlmm 47 GPIO_ACTIVE_HIGH>;*/
+		interrupt-names = "cradle-detect";
+		interrupt-parent = <&tlmm>;
+		interrupts = <&tlmm 36 0>;
+		status = "okay";
+	};
+	hi3w {
+		compatible = "mcn,hi-3w";
+		pinctrl-names = "hi_3w_pins_active", "hi_3w_pin_suspend";
+		pinctrl-0 = <&hi_3w_pins_active>;
+		pinctrl-1 = <&hi_3w_pin_suspend>;
+		mcn,3w-clock-pin = <&tlmm 13 GPIO_ACTIVE_LOW>;
+		mcn,3w-miso-pin = <&tlmm 90 GPIO_ACTIVE_LOW>;
+		mcn,3w-mosi-pin = <&tlmm 22 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
+};
+
+&blsp1_serial1 {
+	status = "disabled";
+};
+
+/*
+&pm8953_rtc {
+	qcom,qpnp-rtc-write = <1>;
+	qcom,qpnp-rtc-alarm-pwrup = <1>;
+}
+*/
+
+&pmi632_charger {
+	qcom,auto-recharge-soc = <70>;
+};

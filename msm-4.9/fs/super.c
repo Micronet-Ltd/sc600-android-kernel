@@ -20,6 +20,7 @@
  *  Heavily rewritten for 'one fs - one tree' dcache architecture. AV, Mar 2000
  */
 
+#define pr_fmt(fmt) "%s %s: " fmt, KBUILD_MODNAME, __func__
 #include <linux/export.h>
 #include <linux/slab.h>
 #include <linux/blkdev.h>
@@ -858,9 +859,32 @@ int do_remount_sb(struct super_block *sb, int flags, void *data, int force)
 	return do_remount_sb2(NULL, sb, flags, data, force);
 }
 
+static RAW_NOTIFIER_HEAD(emergency_remount_chain);
+static DEFINE_RAW_SPINLOCK(emergency_remount_chain_lock);
+static void emergency_remount_notify(unsigned long reason, void *arg)
+{
+    unsigned long flags;
+    pr_notice("\n");
+    raw_spin_lock_irqsave(&emergency_remount_chain_lock, flags);
+    raw_notifier_call_chain(&emergency_remount_chain, reason, 0);
+    raw_spin_unlock_irqrestore(&emergency_remount_chain_lock, flags);
+}
+int emergency_remount_register_notifier(struct notifier_block *nb)
+{
+    unsigned long flags;
+    int err;
+    raw_spin_lock_irqsave(&emergency_remount_chain_lock, flags);
+    err = raw_notifier_chain_register(&emergency_remount_chain, nb);
+    raw_spin_unlock_irqrestore(&emergency_remount_chain_lock, flags);
+    pr_notice("%d\n", err);
+    return err;
+}
+EXPORT_SYMBOL(emergency_remount_register_notifier);
+
 static void do_emergency_remount(struct work_struct *work)
 {
 	struct super_block *sb, *p = NULL;
+	int remount_reason = 0;
 
 	spin_lock(&sb_lock);
 	list_for_each_entry_reverse(sb, &super_blocks, s_list) {
@@ -874,6 +898,7 @@ static void do_emergency_remount(struct work_struct *work)
 			/*
 			 * What lock protects sb->s_flags??
 			 */
+		        remount_reason = 1;
 			do_remount_sb(sb, MS_RDONLY, NULL, 1);
 		}
 		up_write(&sb->s_umount);
@@ -886,7 +911,8 @@ static void do_emergency_remount(struct work_struct *work)
 		__put_super(p);
 	spin_unlock(&sb_lock);
 	kfree(work);
-	printk("Emergency Remount complete\n");
+	pr_notice("Emergency Remount complete\n");
+	emergency_remount_notify(remount_reason, 0);
 }
 
 void emergency_remount(void)

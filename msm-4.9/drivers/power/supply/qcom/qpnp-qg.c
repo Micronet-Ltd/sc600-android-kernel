@@ -40,7 +40,8 @@
 #include "qg-battery-profile.h"
 #include "qg-defs.h"
 
-static int qg_debug_mask;
+//static int qg_debug_mask = 	QG_DEBUG_PON | QG_DEBUG_PROFILE | QG_DEBUG_STATUS | QG_DEBUG_IRQ | QG_DEBUG_SOC | QG_DEBUG_PM;
+static int qg_debug_mask = 	QG_DEBUG_PON | QG_DEBUG_PROFILE | QG_DEBUG_IRQ | QG_DEBUG_PM;
 module_param_named(
 	debug_mask, qg_debug_mask, int, 0600
 );
@@ -267,7 +268,7 @@ static int qg_store_soc_params(struct qpnp_qg *chip)
 
 	for (i = 0; i <= SDAM_TIME_SEC; i++) {
 		rc |= qg_sdam_write(i, chip->sdam_data[i]);
-		qg_dbg(chip, QG_DEBUG_STATUS, "SDAM write param %d value=%d\n",
+		qg_dbg(chip, QG_DEBUG_BUS_WRITE, "SDAM write param %d value=%d\n",
 					i, chip->sdam_data[i]);
 	}
 

@@ -23,6 +23,8 @@
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
 #include <linux/alarmtimer.h>
+/* #include <linux/qpnp/power-on.h> */
+#include <linux/input/qpnp-power-on.h>
 
 /* RTC/ALARM Register offsets */
 #define REG_OFFSET_ALARM_RW	0x40
@@ -646,6 +648,7 @@ static int qpnp_rtc_remove(struct platform_device *pdev)
 
 static void qpnp_rtc_shutdown(struct platform_device *pdev)
 {
+	int rtc_pon_en;
 	u8 value[4] = {0};
 	u8 reg;
 	int rc;
@@ -686,7 +689,12 @@ static void qpnp_rtc_shutdown(struct platform_device *pdev)
 
 fail_alarm_disable:
 		spin_unlock_irqrestore(&rtc_dd->alarm_ctrl_lock, irq_flags);
-	}
+        	rtc_pon_en = 0;
+	} else {
+        	rtc_pon_en = 1;
+ 	}
+	dev_notice(rtc_dd->rtc_dev, "rtc pon trigger [%d]\n", rtc_pon_en);
+	qpnp_pon_trigger_config(PON_RTC, rtc_pon_en);
 }
 
 static const struct of_device_id spmi_match_table[] = {

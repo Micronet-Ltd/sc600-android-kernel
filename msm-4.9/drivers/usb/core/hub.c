@@ -8,6 +8,7 @@
  *
  */
 
+#define pr_fmt(fmt) "%s: " fmt, __func__
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/module.h>
@@ -2182,15 +2183,15 @@ static void show_string(struct usb_device *udev, char *id, char *string)
 {
 	if (!string)
 		return;
-	dev_info(&udev->dev, "%s: %s\n", id, string);
+	dev_notice(&udev->dev, "%s: %s\n", id, string);
 }
 
 static void announce_device(struct usb_device *udev)
 {
-	dev_info(&udev->dev, "New USB device found, idVendor=%04x, idProduct=%04x\n",
+	dev_notice(&udev->dev, "New USB device found, idVendor=%04x, idProduct=%04x\n",
 		le16_to_cpu(udev->descriptor.idVendor),
 		le16_to_cpu(udev->descriptor.idProduct));
-	dev_info(&udev->dev,
+	dev_notice(&udev->dev,
 		"New USB device strings: Mfr=%d, Product=%d, SerialNumber=%d\n",
 		udev->descriptor.iManufacturer,
 		udev->descriptor.iProduct,

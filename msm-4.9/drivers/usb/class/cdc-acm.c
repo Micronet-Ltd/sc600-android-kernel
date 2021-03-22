@@ -1475,7 +1475,7 @@ skip_countries:
 	acm->ctrlurb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 	acm->ctrlurb->transfer_dma = acm->ctrl_dma;
 
-	dev_info(&intf->dev, "ttyACM%d: USB ACM device\n", minor);
+	dev_notice(&intf->dev, "%s: attach ttyACM%d: \n", __func__, minor);
 
 	acm->line.dwDTERate = cpu_to_le32(9600);
 	acm->line.bDataBits = 8;

@@ -36,8 +36,11 @@
 /{
 	mtp_batterydata: qcom,battery-data {
 		qcom,batt-id-range-pct = <15>;
-		#include "qg-batterydata-ascent-3450mah.dtsi"
-		#include "qg-batterydata-mlp356477-2800mah.dtsi"
+		/*#include "qg-batterydata-ascent-3450mah.dtsi"
+		#include "qg-batterydata-mlp356477-2800mah.dtsi"*/
+		#include "batterydata-fullymax-fb382030xl-c801-4v2-135mah_20k.dtsi"
+		/*#include "batterydata-hwe30100100_2p-c801-4v2-6600mah_10k.dtsi"*/
+		/*#include "batterydata-scap-c801-4v2-135mah_30k.dtsi"*/
 	};
 };
 
@@ -88,12 +91,13 @@
 	status = "ok";
 };
 
+/*
 &soc {
 	gpio-leds {
         compatible = "gpio-leds";
         status = "ok";
-        // pinctrl-names = "default";
-        // pinctrl-0 = <&gpio_led_off>;
+        / * pinctrl-names = "default";
+        pinctrl-0 = <&gpio_led_off>; * /
         red {
             gpios = <&tlmm 36 0>;
             label = "red";
@@ -103,6 +107,8 @@
         };
     };
 };
+*/
+
 &thermal_zones {
 	pmi-vbat-lvl0 {
 		cooling-maps {

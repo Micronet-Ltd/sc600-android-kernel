@@ -1,0 +1,6 @@
+config J1708
+	tristate "virtual J1708 interface, for apps and iodriver"
+	default n
+	---help---
+	  This driver provides a virtual interface to send and recieve messages from the MCU's J1708.
+

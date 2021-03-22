@@ -10,6 +10,8 @@
  * GNU General Public License for more details.
  */
 
+#define pr_fmt(fmt) "%s %s: " fmt, KBUILD_MODNAME, __func__
+
 #include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/device.h>
@@ -225,7 +227,7 @@ struct smb5 {
 //#define pr_debug pr_info
 
 //static int __debug_mask = 0xff;
-static int __debug_mask;
+static int __debug_mask = PR_INTERRUPT | PR_OTG;
 module_param_named(
 	debug_mask, __debug_mask, int, 0600
 );
@@ -905,6 +907,7 @@ static enum power_supply_property smb5_usb_port_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
+    POWER_SUPPLY_PROP_SCOPE,
 };
 
 static int smb5_usb_port_get_prop(struct power_supply *psy,
@@ -937,6 +940,9 @@ static int smb5_usb_port_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 		rc = smblib_get_prop_input_current_settled(chg, val);
 		break;
+    case POWER_SUPPLY_PROP_SCOPE:
+        val->intval = chg->otg_en ? POWER_SUPPLY_SCOPE_SYSTEM : POWER_SUPPLY_SCOPE_UNKNOWN;
+        break;
 	default:
 		pr_err_ratelimited("Get prop %d is not supported in pc_port\n",
 				psp);
@@ -955,13 +961,40 @@ static int smb5_usb_port_set_prop(struct power_supply *psy,
 		enum power_supply_property psp,
 		const union power_supply_propval *val)
 {
+    struct smb5 *chip = power_supply_get_drvdata(psy);
+    struct smb_charger *chg = &chip->chg;
 	int rc = 0;
 
 	switch (psp) {
+    case POWER_SUPPLY_PROP_SCOPE:
+        if (chg->otg_en != val->intval) {
+            chg->otg_en = val->intval;
+            vote(chg->awake_votable, OTG_DELAY_VOTER, 1, 0);
+            pr_notice("Scheduling power board connection\n");
+            schedule_delayed_work(&chg->uusb_otg_work, msecs_to_jiffies(chg->otg_delay_ms));
+        }
+        break;
 	default:
 		pr_err_ratelimited("Set prop %d is not supported in pc_port\n",
 				psp);
 		rc = -EINVAL;
+		break;
+	}
+
+	return rc;
+}
+
+static int smb5_usb_port_prop_is_writeable(struct power_supply *psy,
+		enum power_supply_property psp)
+{
+	int rc;
+
+	switch (psp) {
+    case POWER_SUPPLY_PROP_SCOPE:
+        rc = 1;
+        break;
+	default:
+		rc = 0;
 		break;
 	}
 
@@ -975,6 +1008,7 @@ static const struct power_supply_desc usb_port_psy_desc = {
 	.num_properties	= ARRAY_SIZE(smb5_usb_port_props),
 	.get_property	= smb5_usb_port_get_prop,
 	.set_property	= smb5_usb_port_set_prop,
+    .property_is_writeable = smb5_usb_port_prop_is_writeable,
 };
 
 static int smb5_init_usb_port_psy(struct smb5 *chip)

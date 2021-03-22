@@ -10,6 +10,8 @@
  * GNU General Public License for more details.
  */
 
+#define pr_fmt(fmt) "%s %s: " fmt, KBUILD_MODNAME, __func__
+
 #include <linux/device.h>
 #include <linux/regmap.h>
 #include <linux/delay.h>
@@ -35,7 +37,7 @@
 #define smblib_dbg(chg, reason, fmt, ...)			\
 	do {							\
 		if (*chg->debug_mask & (reason))		\
-			pr_info("%s: %s: " fmt, chg->name,	\
+			pr_notice("%s: %s: " fmt, chg->name,	\
 				__func__, ##__VA_ARGS__);	\
 		else						\
 			pr_debug("%s: %s: " fmt, chg->name,	\
@@ -3030,6 +3032,7 @@ irqreturn_t icl_change_irq_handler(int irq, void *data)
 
 static void smblib_micro_usb_plugin(struct smb_charger *chg, bool vbus_rising)
 {
+    smblib_dbg(chg, PR_INTERRUPT, "vbus rising %d\n", vbus_rising);
 	if (!vbus_rising) {
 		smblib_update_usb_type(chg);
 		smblib_notify_device_mode(chg, false);
@@ -3386,6 +3389,7 @@ static void smblib_handle_apsd_done(struct smb_charger *chg, bool rising)
 	apsd_result = smblib_update_usb_type(chg);
 
 	update_sw_icl_max(chg, apsd_result->pst);
+    smblib_dbg(chg, PR_INTERRUPT, "APSD_STATUS = 0x%02x\n", apsd_result->bit);
 
 	switch (apsd_result->bit) {
 	case SDP_CHARGER_BIT:
@@ -3720,9 +3724,11 @@ irqreturn_t typec_attach_detach_irq_handler(int irq, void *data)
 
 		if (stat & SNK_SRC_MODE_BIT) {
 			chg->sink_src_mode = SRC_MODE;
+            smblib_dbg(chg, PR_INTERRUPT, "sourcing the power\n");
 			typec_sink_insertion(chg);
 		} else {
 			chg->sink_src_mode = SINK_MODE;
+            smblib_dbg(chg, PR_INTERRUPT, "sinking the power\n");
 			typec_src_insertion(chg);
 		}
 
@@ -3988,13 +3994,19 @@ static void smblib_uusb_otg_work(struct work_struct *work)
 	int rc;
 	u8 stat;
 	bool otg;
+    union power_supply_propval pval = {0, };
 
 	rc = smblib_read(chg, TYPEC_U_USB_STATUS_REG, &stat);
 	if (rc < 0) {
 		smblib_err(chg, "Couldn't read TYPE_C_STATUS_3 rc=%d\n", rc);
 		goto out;
 	}
-	otg = !!(stat & U_USB_GROUND_NOVBUS_BIT);
+    rc = power_supply_get_property(chg->usb_port_psy, POWER_SUPPLY_PROP_SCOPE, &pval);
+    if (POWER_SUPPLY_SCOPE_SYSTEM == pval.intval) {
+        otg = 1;
+    } else {
+        otg = !!(stat & U_USB_GROUND_NOVBUS_BIT); 
+    }
 	if (chg->otg_present != otg)
 		smblib_notify_usb_host(chg, otg);
 	else

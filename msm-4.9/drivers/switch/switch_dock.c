@@ -722,8 +722,8 @@ static void dock_switch_work_func_fix(struct work_struct *work)
                     pr_notice("k20 cancel usb bypass back to dfp %lld\n", ktime_to_ms(ktime_get()));
                     allow_ufp = 0; 
 
-                    //prop.intval = 0x0;
-                    //power_supply_set_usb_otg(ds->usb_psy, prop.intval);
+                    prop.intval = POWER_SUPPLY_SCOPE_SYSTEM;
+                    power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
                     msleep(500);
                 }
             } else if (val > SC_ENH_NBP - 400 && val < SC_ENH_NBP + 1000) {
@@ -731,8 +731,8 @@ static void dock_switch_work_func_fix(struct work_struct *work)
                     pr_notice("k20 cancel usb bypass back to dfp %lld\n", ktime_to_ms(ktime_get()));
                     allow_ufp = 0; 
 
-                    //prop.intval = 0x0;
-                    //power_supply_set_usb_otg(ds->usb_psy, prop.intval);
+                    prop.intval = POWER_SUPPLY_SCOPE_SYSTEM;
+                    power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
                     msleep(500);
                 }
 
@@ -744,8 +744,8 @@ static void dock_switch_work_func_fix(struct work_struct *work)
                 if (!allow_ufp) {
                     pr_notice("k20 bypass usb host, allow ufp %lld\n", ktime_to_ms(ktime_get())); 
                     allow_ufp = 1; 
-                    //prop.intval = 0x0;
-                    //power_supply_set_usb_otg(ds->usb_psy, prop.intval);
+                    prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+                    power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
                     msleep(500);
                 }
                 if (e_dock_type_smart == ds->dock_type) {
@@ -820,15 +820,15 @@ static void dock_switch_work_func_fix(struct work_struct *work)
                     sys_close(fd);
                 }
             }
-            prop.intval = 0x20;
+            prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
         } else {
             if (allow_ufp) {
-                prop.intval = 0x20; 
+                prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN; 
             } else {
-                prop.intval = 0x11;
+                prop.intval = POWER_SUPPLY_SCOPE_SYSTEM;
             }
         }
-        //power_supply_set_usb_otg(ds->usb_psy, prop.intval);
+        power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
         prop.intval = 1500*1000;
         power_supply_set_property(ds->usb_psy, POWER_SUPPLY_PROP_SDP_CURRENT_MAX, &prop);
     }

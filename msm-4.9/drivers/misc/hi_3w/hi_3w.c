@@ -11,7 +11,6 @@
 //#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
-// BYU   #include <linux/switch.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
@@ -20,7 +19,6 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/workqueue.h>
-// BYU  #include <linux/wakelock.h>
 #include <linux/pm_wakeup.h>
 
 #include <linux/notifier.h>

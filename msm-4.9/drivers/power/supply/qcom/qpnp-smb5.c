@@ -227,7 +227,8 @@ struct smb5 {
 //#define pr_debug pr_info
 
 //static int __debug_mask = 0xff;
-static int __debug_mask = PR_INTERRUPT | PR_OTG;
+//static int __debug_mask = PR_INTERRUPT | PR_OTG;
+static int __debug_mask = PR_OTG;
 module_param_named(
 	debug_mask, __debug_mask, int, 0600
 );

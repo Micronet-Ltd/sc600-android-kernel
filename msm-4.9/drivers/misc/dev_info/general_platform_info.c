@@ -18,9 +18,11 @@
 static char mcu_ver[VER_BUF_SIZE] = {0};
 static char board_id[VER_BUF_SIZE] = {0};
 static char fpga_ver[VER_BUF_SIZE] = {0};
+static char vib_profile[VER_BUF_SIZE] = {0};
 static const char *MCU_VER_FILE = "mcu_version";
 static const char *FPGA_VER_FILE = "fpga_version";
 static const char *board_id_file = "board_id";
+static const char *vib_profile_file = "vib_profile";
 static struct dentry *debugfs_base = 0;
 
 
@@ -120,6 +122,42 @@ static const struct file_operations proc_info_bid_fops = {
 	.release    = single_release,
 };
 
+static int vibp_show(struct seq_file *m, void *v) {
+    seq_printf(m, vib_profile);
+    return 0;
+}
+
+static int proc_info_vibp_open(struct inode *inode, struct  file *file) 
+{
+    return single_open(file, vibp_show, NULL);
+}
+
+static ssize_t dev_vibp_proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *pos)
+{
+    char vibp[VER_BUF_SIZE] = {0};
+
+    if (count > sizeof(vib_profile)) {
+        return -EFAULT;
+    }
+
+    if (copy_from_user(vibp, buffer, count)) { 
+        return -EFAULT;
+    }
+    memset(vib_profile, 0, sizeof(vib_profile));
+    strncpy(vib_profile, vibp, count);
+
+    return count; 
+}
+
+static const struct file_operations proc_info_vibp_fops = {
+    .owner      = THIS_MODULE,
+	.open	    = proc_info_vibp_open,
+	.read	    = seq_read,
+    .write	    = dev_vibp_proc_write,
+	.llseek	    = seq_lseek,
+	.release    = single_release,
+};
+
 static int dev_info_debug_init(void)
 {
     debugfs_base = debugfs_create_dir("dev_info", NULL);
@@ -130,6 +168,9 @@ static int dev_info_debug_init(void)
         return -ENOMEM;
 
     if (!debugfs_create_file(FPGA_VER_FILE, S_IRUGO | S_IWUGO, debugfs_base, NULL, &proc_info_fpga_fops))
+        return -ENOMEM;
+
+    if (!debugfs_create_file(vib_profile_file, S_IRUGO | S_IWUGO, debugfs_base, NULL, &proc_info_vibp_fops))
         return -ENOMEM;
 
     return 0;
@@ -249,6 +290,7 @@ int __init dev_info_init(void)
     proc_create(MCU_VER_FILE, S_IRUGO | S_IWUGO, NULL, &proc_info_mcu_fops);
     proc_create(FPGA_VER_FILE, S_IRUGO | S_IWUGO, NULL, &proc_info_fpga_fops);
     proc_create(board_id_file, S_IRUGO | S_IWUGO, NULL, &proc_info_bid_fops);
+    proc_create(vib_profile_file, S_IRUGO | S_IWUGO, NULL, &proc_info_vibp_fops);
 
     dev_info_debug_init();
 
@@ -259,6 +301,8 @@ void __exit dev_info_exit(void)
 {
     remove_proc_entry(MCU_VER_FILE, NULL);
     remove_proc_entry(FPGA_VER_FILE, NULL);
+    remove_proc_entry(board_id_file, NULL);
+    remove_proc_entry(vib_profile_file, NULL);
 
     if (debugfs_base)
         debugfs_remove_recursive(debugfs_base);

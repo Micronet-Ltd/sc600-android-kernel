@@ -22,7 +22,7 @@
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
-// BYU #include "../../../../out/target/product/msm8953_64_c801/obj/kernel/msm-3.18/include/generated/autoconf.h"
+#include "../../../../out/target/product/msm8953_64/obj/kernel/msm-4.9/include/generated/autoconf.h"
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -37,8 +37,6 @@
 #include <linux/interrupt.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
-
-// BYU #include <linux/wakelock.h>
 #include <linux/pm_wakeup.h>
 
 #include <linux/hwmon.h>
@@ -50,6 +48,10 @@
 #include <linux/fcntl.h>
 //#include <linux/cpufreq.h>
 #endif
+
+struct wake_lock {
+	struct wakeup_source ws;
+};
 
 struct pwr_loss_mon_attr {
     struct device_attribute attr;
@@ -72,9 +74,7 @@ struct power_loss_monitor {
     struct notifier_block pwr_loss_mon_remount_notifier;
     struct notifier_block pwr_loss_mon_cradle_notifier;
     struct notifier_block pwr_loss_mon_vbus_notifier;
-
-// BYU    struct wake_lock wlock;
-    struct  wakeup_source wlock;
+    struct wake_lock wlock;
 	int    pwr_lost_irq;
     int    pwr_lost_pin;
     int    pwr_lost_pin_l;
@@ -104,7 +104,6 @@ void power_loss_notify(struct power_loss_monitor *pwrl, unsigned long reason, vo
 {
 	unsigned long flags;
 
-printk("byu003 %s: %d  \n", __func__, __LINE__);
     raw_spin_lock_irqsave(&power_lost_chain_lock, flags);
     raw_notifier_call_chain(&power_lost_chain, reason, 0);
     raw_spin_unlock_irqrestore(&power_lost_chain_lock, flags);
@@ -132,7 +131,6 @@ static void adreno_suspend(struct power_loss_monitor *pwrl, int s)
     sys_write(fd, suspend, 1);
     sys_close(fd);
 #endif
-printk("byu003 %s: %d  \n", __func__, __LINE__);
     pr_notice("[%d] not supported, camera must work\n", s);
 
     return;
@@ -151,7 +149,6 @@ static void wcnss_suspend(struct power_loss_monitor *pwrl, int s)
     sys_write(fd, "1", 1);
     sys_close(fd);
 #endif
-printk("byu003 %s: %d  \n", __func__, __LINE__);
     pr_notice("[%d] not supported, network must work\n", s);
 
     return;
@@ -160,7 +157,7 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
 void enable_irq_safe(int irq, int en)
 {
     struct irq_desc *desc;
-printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     desc = irq_to_desc(irq);
 
     if(en && desc->depth > 0) {
@@ -180,7 +177,6 @@ static void remount_ro(struct power_loss_monitor *pwrl)
 {
     int fd, i = 0;
 
-printk("byu003 %s: %d  \n", __func__, __LINE__);
     fd = emergency_remount_register_notifier(&pwrl->pwr_loss_mon_remount_notifier);
     if (fd) {
         pr_err("failure to register remount notifier [%d]\n", fd);
@@ -208,8 +204,6 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
     int val, err, usb_online;
     long long timer;
 	struct power_loss_monitor *pwrl = container_of(work, struct power_loss_monitor, pwr_lost_work.work);
-
-printk("byu003 %s: %d  \n", __func__, __LINE__);
 
     spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags);
     timer = ktime_to_ms(ktime_get());
@@ -240,7 +234,7 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
         } else if (-1 == pwrl->batt_is_scap) {
             union power_supply_propval prop = {0,};
 
-            err = pwrl->bms_psy->get_property(pwrl->bms_psy, POWER_SUPPLY_PROP_BATTERY_TYPE, &prop);
+            err = pwrl->bms_psy->desc->get_property(pwrl->bms_psy, POWER_SUPPLY_PROP_BATTERY_TYPE, &prop);
             if (err) {
                 pr_notice("failure to get battery type %lld\n", ktime_to_ms(ktime_get()));
                 enable_irq_safe(pwrl->pwr_lost_irq, 0);
@@ -300,7 +294,7 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
         wcnss_suspend(pwrl, 0);
         power_loss_notify(pwrl, 0, 0);
         enable_irq_safe(pwrl->pwr_lost_irq, 1);
-        wake_unlock(&pwrl->wlock);
+        __pm_relax(&pwrl->wlock.ws);
 
         return;
     } else if (-1 == pwrl->pwr_lost_off_d) {
@@ -318,7 +312,7 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
         power_loss_notify(pwrl, 1, 0);
         pr_notice("shudown adreno %lld\n", ktime_to_ms(ktime_get()));
         adreno_suspend(pwrl, 1);
-        wake_lock(&pwrl->wlock);
+        __pm_stay_awake(&pwrl->wlock.ws);
         pr_notice("shutdown cores %lld\n", ktime_to_ms(ktime_get()));
         for (val = num_possible_cpus() - 1; val > 0; val--) {
             if (!cpu_online(val))
@@ -377,8 +371,6 @@ static irqreturn_t pwr_loss_irq_handler(int irq, void *irq_data)
 {
 	struct power_loss_monitor *pwrl = irq_data;
 
-printk("byu003 %s: %d  \n", __func__, __LINE__);
-
 	disable_irq_nosync(pwrl->pwr_lost_irq);
     cancel_delayed_work(&pwrl->pwr_lost_work);
 
@@ -397,7 +389,6 @@ static int __ref pwr_loss_remount_callback(struct notifier_block *nfb, unsigned 
 {
     struct power_loss_monitor *pwrl = container_of(nfb, struct power_loss_monitor, pwr_loss_mon_remount_notifier);
 
-printk("byu003 %s: %d  \n", __func__, __LINE__);
     spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags);
     pwrl->remount_complete = (unsigned int)a;
     pr_notice("remounted %d\n", pwrl->remount_complete);
@@ -411,7 +402,6 @@ static int __ref pwr_loss_cpu_callback(struct notifier_block *nfb, unsigned long
 //	uint32_t cpu = (uintptr_t)pcpu;
     struct power_loss_monitor *pwrl = container_of(nfb, struct power_loss_monitor, pwr_loss_mon_cpu_notifier);
 
-printk("byu003 %s: %d  \n", __func__, __LINE__);
 	if (a == CPU_UP_PREPARE || a == CPU_UP_PREPARE_FROZEN) {
 		if (pwrl->pwr_lost_off_d != -1) {
 			// pr_notice("prevent cpu%d up\n", cpu);
@@ -426,7 +416,7 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
 static int __ref pwr_loss_cradle_callback(struct notifier_block *nfb, unsigned long r, void *p)
 {
     struct power_loss_monitor *pwrl = container_of(nfb, struct power_loss_monitor, pwr_loss_mon_cradle_notifier);
-printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     pwrl->cradle_attached = r;
     pr_notice("cradle state %d\n", pwrl->cradle_attached);
 
@@ -437,7 +427,6 @@ static int __ref pwr_loss_vbus_callback(struct notifier_block *nfb, unsigned lon
 {
     struct power_loss_monitor *pwrl = container_of(nfb, struct power_loss_monitor, pwr_loss_mon_vbus_notifier);
 
-printk("byu003 %s: %d  \n", __func__, __LINE__);
     pr_notice("vbus state %ld[%d]\n", r, pwrl->cradle_attached);
 
     if (!pwrl->cradle_attached) {
@@ -459,7 +448,7 @@ int power_loss_register_notifier(struct notifier_block *nb)
 {
 	unsigned long flags;
     int err;
-printk("byu003 %s: %d  \n", __func__, __LINE__);
+
 	raw_spin_lock_irqsave(&power_lost_chain_lock, flags);
 	err = raw_notifier_chain_register(&power_lost_chain, nb);
 	raw_spin_unlock_irqrestore(&power_lost_chain_lock, flags);
@@ -487,7 +476,6 @@ power_loss_register_notifier(<specific> *dev_specific->power_loss_notifier)
 
 static ssize_t pwr_loss_mon_show_name(struct device *dev, struct device_attribute *attr, char *buf)
 {
-printk("byu003 %s: %d  \n", __func__, __LINE__);
 	return sprintf(buf, "%s\n", "pwr-loss-mon");
 }
 
@@ -495,10 +483,10 @@ static DEVICE_ATTR(name, 0444, pwr_loss_mon_show_name, 0);
 
 static ssize_t pwr_loss_mon_in_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	int val = -1, usb_online;
+	int val = -1, usb_online = 0;
     struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
     union power_supply_propval prop = {0,};
-printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     if (!pwrl->usb_psy) {
         pr_notice("usb power supply not ready %lld\n", ktime_to_ms(ktime_get()));
         pwrl->usb_psy = power_supply_get_by_name("usb");
@@ -512,7 +500,7 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
         val = gpio_get_value(pwrl->pwr_lost_pin);
     }
 
-    if (0 != pwrl->bms_psy->get_property(pwrl->bms_psy, POWER_SUPPLY_PROP_BATTERY_TYPE, &prop) || !prop.strval) {
+    if (0 != pwrl->bms_psy->desc->get_property(pwrl->bms_psy, POWER_SUPPLY_PROP_BATTERY_TYPE, &prop) || !prop.strval) {
         prop.strval = "unknown";
     }
 
@@ -524,7 +512,6 @@ static ssize_t pwr_loss_mon_in_l_show(struct device *dev, struct device_attribut
 {
     struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
 
-printk("byu003 %s: %d  \n", __func__, __LINE__);
 	return sprintf(buf, "%d\n", pwrl->pwr_lost_pin_l);
 }
 
@@ -532,7 +519,7 @@ static ssize_t pwr_loss_mon_in_l_store(struct device *dev, struct device_attribu
 {
     int val;
     struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
-printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     if (kstrtos32(buf, 10, &val))
         return -EINVAL;
 
@@ -546,7 +533,7 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
 static ssize_t pwr_loss_mon_offd_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
-printk("byu003 %s: %d  \n", __func__, __LINE__);
+
 	return sprintf(buf, "%d\n", pwrl->pwr_lost_off_cd);
 }
 
@@ -554,7 +541,7 @@ static ssize_t pwr_loss_mon_offd_store(struct device *dev, struct device_attribu
 {
     int val;
     struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
-printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     if (kstrtos32(buf, 10, &val))
         return -EINVAL;
 
@@ -569,7 +556,6 @@ static ssize_t pwr_loss_mon_wand_show(struct device *dev, struct device_attribut
 {
     struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
 
-printk("byu003 %s: %d  \n", __func__, __LINE__);
 	return sprintf(buf, "%d\n", pwrl->pwr_lost_wan_cd);
 }
 
@@ -578,7 +564,6 @@ static ssize_t pwr_loss_mon_wand_store(struct device *dev, struct device_attribu
     int val;
     struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
 
-printk("byu003 %s: %d  \n", __func__, __LINE__);
     if (kstrtos32(buf, 10, &val))
         return -EINVAL;
 
@@ -592,7 +577,7 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
 static ssize_t pwr_loss_mon_wland_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
-printk("byu003 %s: %d  \n", __func__, __LINE__);
+
 	return sprintf(buf, "%d\n", pwrl->pwr_lost_wlan_cd);
 }
 
@@ -600,7 +585,7 @@ static ssize_t pwr_loss_mon_wland_store(struct device *dev, struct device_attrib
 {
     int val;
     struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
-printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     if (!pwrl->sys_ready) {
         return -EINVAL;
     }
@@ -623,7 +608,7 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
     struct device_node *np;
     struct pinctrl_state *pctls;
     const char *c;
-printk("byu003 %s: %d  \n", __func__, __LINE__);
+
     np = dev->of_node; //of_find_compatible_node(0, 0, "a8-hm-power-lost");
     if (!np) {
         pr_err("failure to find device tree\n");
@@ -651,8 +636,7 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
     }
 
     spin_lock_init(&pwrl->pwr_lost_lock);
-// BYU    wake_lock_init(&pwrl->wlock, WAKE_LOCK_SUSPEND, "pwr_loss_suspend_lock");
-    wakeup_source_init(&pwrl->wlock, "pwr_loss_suspend_lock");
+    wakeup_source_init(&pwrl->wlock.ws, "pwr_loss_suspend_lock");
 
     snprintf(pwrl->attr_state.name, sizeof(pwrl->attr_state.name) - 1, "state");
     pwrl->attr_state.attr.attr.name = pwrl->attr_state.name;
@@ -721,7 +705,7 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
     if (err) {
         pr_err("failure to register cpu notifier [%d]\n", err);
     }
-// BYU     cradle_register_notifier(&pwrl->pwr_loss_mon_cradle_notifier);
+    cradle_register_notifier(&pwrl->pwr_loss_mon_cradle_notifier);
 
     do {
         pwrl->pctl = devm_pinctrl_get(dev);
@@ -881,8 +865,6 @@ static int pwr_loss_mon_suspend(struct device *dev)
 {
     struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
 
-printk("byu003 %s: %d  \n", __func__, __LINE__);
-
     if (pwrl->pwr_lost_off_d != -1) {
         return -EINVAL;
     }
@@ -900,8 +882,6 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
 static int pwr_loss_mon_resume(struct device *dev)
 {
     struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
-
-printk("byu003 %s: %d  \n", __func__, __LINE__);
 
     enable_irq_safe(pwrl->pwr_lost_irq, 0);
 
@@ -936,15 +916,10 @@ static int pwr_loss_mon_remove(struct platform_device *pdev)
     cancel_delayed_work(&pwrl->pwr_lost_work);
     enable_irq_safe(pwrl->pwr_lost_irq, 0);
 
-// BYU    wake_lock_destroy(&pwrl->wlock);
-	wakeup_source_trash(&pwrl->wlock);
+	wakeup_source_trash(&pwrl->wlock.ws);
 	
 //    if (device_may_wakeup(&pdev->dev))
 //        disable_irq_wake(pwrl->pwr_lost_irq);
-
-
-printk("byu003 %s: %d  \n", __func__, __LINE__);
-
     device_wakeup_disable(&pdev->dev);
     devm_free_irq(&pdev->dev, pwrl->pwr_lost_irq, pwrl);
 
@@ -969,8 +944,6 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
 }
 
 static void pwr_loss_mon_shutdown(struct platform_device *pdev) {
-
-printk("byu003 %s: %d  \n", __func__, __LINE__);
     pwr_loss_mon_remove(pdev);
 }
 
@@ -995,7 +968,6 @@ static struct platform_driver pwr_loss_mon_platform_driver = {
 
 static int __init pwr_loss_mon_init(void)
 {
-printk("byu003 %s: %d  \n", __func__, __LINE__);
 	return platform_driver_register(&pwr_loss_mon_platform_driver);
 }
 

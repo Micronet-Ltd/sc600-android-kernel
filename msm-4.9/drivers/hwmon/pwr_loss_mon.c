@@ -158,7 +158,11 @@ void enable_irq_safe(int irq, int en)
 {
     struct irq_desc *desc;
 
-    desc = irq_to_desc(irq);
+    if (irq < 0) {
+        return;
+    }
+
+    desc = irq_to_desc(irq); 
 
     if(en && desc->depth > 0) {
         enable_irq(irq);
@@ -204,10 +208,15 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
     int val, err, usb_online;
     long long timer;
 	struct power_loss_monitor *pwrl = container_of(work, struct power_loss_monitor, pwr_lost_work.work);
+    union power_supply_propval prop = {0,};
 
     spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags);
     timer = ktime_to_ms(ktime_get());
-    val = gpio_get_value(pwrl->pwr_lost_pin);
+    if (gpio_is_valid(pwrl->pwr_lost_pin)) {
+        val = gpio_get_value(pwrl->pwr_lost_pin);
+    } else {
+        val = 1;
+    }
 
     if (!pwrl->usb_psy) {
         pr_notice("usb power supply not ready %lld\n", ktime_to_ms(ktime_get()));
@@ -215,11 +224,11 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
     }
 
     if (pwrl->usb_psy) {
-        usb_online = power_supply_is_system_supplied();
+        err = pwrl->usb_psy->desc->get_property(pwrl->usb_psy, POWER_SUPPLY_PROP_PRESENT, &prop);
+        usb_online = prop.intval;
     } else {
         usb_online = 0;
     }
-
     spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
 
     if (pwrl->portable) {
@@ -232,8 +241,6 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
             schedule_delayed_work(&pwrl->pwr_lost_work, msecs_to_jiffies(100));
             return;
         } else if (-1 == pwrl->batt_is_scap) {
-            union power_supply_propval prop = {0,};
-
             err = pwrl->bms_psy->desc->get_property(pwrl->bms_psy, POWER_SUPPLY_PROP_BATTERY_TYPE, &prop);
             if (err) {
                 pr_notice("failure to get battery type %lld\n", ktime_to_ms(ktime_get()));
@@ -270,7 +277,7 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
         return;
     }
 
-    if (pwrl->pwr_lost_pin_l != val || (usb_online && (0 == pwrl->cradle_attached))) {
+    if ((pwrl->pwr_lost_pin_l != val) || (usb_online && (0 == pwrl->cradle_attached))) {
         enable_irq_safe(pwrl->pwr_lost_irq, 0);
         spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags);
         pwrl->pwr_lost_wan_d = pwrl->pwr_lost_wlan_d = pwrl->pwr_lost_off_d = -1;
@@ -493,7 +500,8 @@ static ssize_t pwr_loss_mon_in_show(struct device *dev, struct device_attribute 
     }
 
     if (pwrl->usb_psy) {
-        usb_online = power_supply_is_system_supplied();
+        pwrl->usb_psy->desc->get_property(pwrl->usb_psy, POWER_SUPPLY_PROP_PRESENT, &prop);
+        usb_online = prop.intval;
     }
 
     if (gpio_is_valid(pwrl->pwr_lost_pin)) {
@@ -706,6 +714,8 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
         pr_err("failure to register cpu notifier [%d]\n", err);
     }
     cradle_register_notifier(&pwrl->pwr_loss_mon_cradle_notifier);
+    pwrl->pwr_lost_irq = -1;
+    pwrl->pwr_lost_pin = -1;
 
     do {
         pwrl->pctl = devm_pinctrl_get(dev);
@@ -725,22 +735,28 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
             if (IS_ERR(pctls)) {
                 dev_err(dev, "failure to get pinctrl active state\n");
                 err = PTR_ERR(pctls);
-                break;
-            }
-            err = pinctrl_select_state(pwrl->pctl, pctls);
-            if (err) {
-                dev_err(dev, "failure to set pinctrl active state\n");
-                break;
+                pr_notice("pin control isn't used\n");
+                pwrl->pctl = 0;
+            } else {
+                err = pinctrl_select_state(pwrl->pctl, pctls);
+                if (err) {
+                    dev_err(dev, "failure to set pinctrl active state\n");
+                    pr_notice("pin control isn't used\n");
+                    pwrl->pctl = 0;
+                }
             }
         }
 
         val = of_get_named_gpio_flags(np, "mcn,pwr-loss-mon", 0, (enum of_gpio_flags *)&pwrl->pwr_lost_pin_l);
         if (!gpio_is_valid(val)) {
             pr_err("ivalid power lost detect pin\n");
-            err = -EINVAL;
-            break;
+            //err = -EINVAL;
+            //break;
+            pwrl->pwr_lost_pin = -1;
+            pwrl->pwr_lost_pin_l = 1;
+        } else {
+            pwrl->pwr_lost_pin = val;
         }
-        pwrl->pwr_lost_pin = val;
         pwrl->pwr_lost_pin_l = !pwrl->pwr_lost_pin_l;
         pr_notice("power loss indicator %d\n", pwrl->pwr_lost_pin);
         pr_notice("power loss active level %s\n", (pwrl->pwr_lost_pin_l)?"high":"low");
@@ -788,33 +804,39 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
 
         dev_set_drvdata(dev, pwrl);
 
-        err = devm_gpio_request(dev, pwrl->pwr_lost_pin, "input-power-state");
-        if (err < 0) {
-            pr_err("failure to request the gpio[%d]\n", pwrl->pwr_lost_pin);
-            break;
+        if (gpio_is_valid(pwrl->pwr_lost_pin)) {
+            err = devm_gpio_request(dev, pwrl->pwr_lost_pin, "input-power-state");
+            if (err < 0) {
+                pr_err("failure to request the gpio[%d]\n", pwrl->pwr_lost_pin);
+                break;
+            }
+    		err = gpio_direction_input(pwrl->pwr_lost_pin);
+    		if (err < 0) {
+                pr_err("failure to set direction of the gpio[%d]\n", pwrl->pwr_lost_pin);
+                break;
+    		}
+            gpio_export(pwrl->pwr_lost_pin, 0);
         }
-		err = gpio_direction_input(pwrl->pwr_lost_pin);
-		if (err < 0) {
-            pr_err("failure to set direction of the gpio[%d]\n", pwrl->pwr_lost_pin);
-            break;
-		}
-        gpio_export(pwrl->pwr_lost_pin, 0);
 
         INIT_DELAYED_WORK(&pwrl->pwr_lost_work, pwr_loss_mon_work);
 
-		pwrl->pwr_lost_irq = gpio_to_irq(pwrl->pwr_lost_pin);
-		if (pwrl->pwr_lost_irq < 0) {
-            pr_err("failure to request gpio[%d] irq\n", pwrl->pwr_lost_pin);
-		} else {
-            err = devm_request_irq(dev, pwrl->pwr_lost_irq, pwr_loss_irq_handler,
-                                   IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-                                   pdev->name, pwrl);
-            if (!err) {
-                enable_irq_safe(pwrl->pwr_lost_irq, 0);
-                device_init_wakeup(dev, 1);
-            } else {
-                pr_err("failure to request irq[%d] irq\n", pwrl->pwr_lost_irq);
+        if (gpio_is_valid(pwrl->pwr_lost_pin)) {
+    		pwrl->pwr_lost_irq = gpio_to_irq(pwrl->pwr_lost_pin);
+    		if (pwrl->pwr_lost_irq < 0) {
+                pr_err("failure to request gpio[%d] irq\n", pwrl->pwr_lost_pin);
+    		} else {
+                err = devm_request_irq(dev, pwrl->pwr_lost_irq, pwr_loss_irq_handler,
+                                       IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+                                       pdev->name, pwrl);
+                if (!err) {
+                    enable_irq_safe(pwrl->pwr_lost_irq, 0);
+                    device_init_wakeup(dev, 1);
+                } else {
+                    pr_err("failure to request irq[%d] irq\n", pwrl->pwr_lost_irq);
+                }
             }
+        } else {
+            device_init_wakeup(dev, 0);
         }
 
 		pwrl->pwr_lost_timer = -1;

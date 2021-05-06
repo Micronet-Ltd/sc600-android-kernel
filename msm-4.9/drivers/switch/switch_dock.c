@@ -263,7 +263,7 @@ int cradle_unregister_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL(cradle_unregister_notifier);
 
-//extern int power_ok_register_notifier(struct notifier_block *nb);
+extern int power_ok_register_notifier(struct notifier_block *nb);
 static int __ref dock_switch_vbus_callback(struct notifier_block *nfb, unsigned long r, void *p)
 {
     struct dock_switch_device *ds = container_of(nfb, struct dock_switch_device, dock_switch_vbus_notifier);
@@ -665,6 +665,11 @@ static void dock_switch_work_func_fix(struct work_struct *work)
     if (!ds->usb_psy) {
         pr_notice("usb power supply not ready %lld\n", ktime_to_ms(ktime_get()));
         ds->usb_psy = power_supply_get_by_name("usb");
+        if (ds->usb_psy) {
+            ds->dock_switch_vbus_notifier.notifier_call = dock_switch_vbus_callback;
+            power_ok_register_notifier(&ds->dock_switch_vbus_notifier);
+        }
+
         msleep(200);
         schedule_work(&ds->work);
 
@@ -1615,9 +1620,6 @@ static int dock_switch_probe(struct platform_device *pdev)
         }
 
         spin_lock_init(&ds->outs_mask_lock);
-
-        ds->dock_switch_vbus_notifier.notifier_call = dock_switch_vbus_callback;
-        //power_ok_register_notifier(&ds->dock_switch_vbus_notifier);
 
         ds->pdev = dev;
         dev_set_drvdata(dev, ds);

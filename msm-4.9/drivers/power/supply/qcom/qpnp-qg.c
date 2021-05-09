@@ -3863,6 +3863,12 @@ static int qpnp_qg_probe(struct platform_device *pdev)
 		pr_err("Failed to initialize QG psy, rc=%d\n", rc);
 		goto fail_votable;
 	}
+    if (0 == strncmp(chip->bp.batt_type_str, "c801_scap_4v2_135mah_30k", strlen("c801_scap_4v2_135mah_30k"))) {
+        union power_supply_propval prop = {0,};
+        prop.intval = 1;
+        pr_notice("s-cap profile, disable charging\n");
+        power_supply_set_property(chip->batt_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
+    }
 
 	rc = qg_request_irqs(chip);
 	if (rc < 0) {

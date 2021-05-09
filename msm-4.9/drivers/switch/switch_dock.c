@@ -451,8 +451,8 @@ static void dock_switch_work_func(struct work_struct *work)
                         }
                         pr_notice("notify usb host about unplug cradel %lld\n", ktime_to_ms(ktime_get()));
 
-                        //prop.intval = 0;
-                        //power_supply_set_usb_otg(ds->usb_psy, prop.intval);
+                        prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+                        power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
                         ds->status_change_guard = ktime_to_ms(ktime_get()) + 1000;
 					}
 					ds->dock_type = e_dock_type_unspecified;
@@ -529,11 +529,14 @@ static void dock_switch_work_func(struct work_struct *work)
                 if (1 /*prop.intval*/) {
                     pr_notice("smart cradle attempt to be plugged %lld\n", ktime_to_ms(ktime_get()));
                     ds->dock_type = e_dock_type_smart;
-                    prop.intval = 0x11; 
+
+                    prop.intval = POWER_SUPPLY_SCOPE_SYSTEM;
+                    power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
                     //power_supply_set_usb_otg(ds->usb_psy, prop.intval);
                     prop.intval = 1500*1000;
                     power_supply_set_property(ds->usb_psy, POWER_SUPPLY_PROP_SDP_CURRENT_MAX, &prop);
                     ds->status_change_guard = ktime_to_ms(ktime_get()) + 100;
+                    prop.intval = 0x11;
                 } else {
                     pr_notice("unstable connection, detach all %lld\n", ktime_to_ms(ktime_get()));
                 }
@@ -581,22 +584,17 @@ static void dock_switch_work_func(struct work_struct *work)
         ds->irq_ack = 0;
         if (gpio_is_valid(ds->ign_pin)) {
             if (ds->ign_active_l != gpio_get_value(ds->ign_pin)) {
-#if 0
-                prop.intval = 0x55AA;
-                ds->usb_psy->get_property(ds->usb_psy, POWER_SUPPLY_PROP_USB_OTG, &prop);
-                if (prop.intval) {
-                    prop.intval = 0x20;
-                    power_supply_set_usb_otg(ds->usb_psy, prop.intval);
-                }
-#endif
+                prop.intval = POWER_SUPPLY_SCOPE_SYSTEM;
+                power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
                 prop.intval = 1500*1000;
                 power_supply_set_property(ds->usb_psy, POWER_SUPPLY_PROP_SDP_CURRENT_MAX, &prop);
                 pr_notice("basic cradle plagged %lld\n", ktime_to_ms(ktime_get()));
                 val |= SWITCH_DOCK;
+                prop.intval = 0x20;
             } else {
                 pr_notice("basic cradle unplagged %lld\n", ktime_to_ms(ktime_get()));
-                //prop.intval = 0x0;
-                //power_supply_set_usb_otg(ds->usb_psy, prop.intval);
+                prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+                power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
                 ds->dock_type = e_dock_type_unspecified;
                 // switch otg connector
                 if (gpio_is_valid(ds->usb_switch_pin)) {
@@ -660,7 +658,7 @@ static void dock_switch_work_func_fix(struct work_struct *work)
     char ver[16];
     int transmit_err = -3;
     int err_cnt = 0;
-    static int allow_ufp = 0;
+    static int allow_ufp = 0, ufp_only = 0;
 
     if (!ds->usb_psy) {
         pr_notice("usb power supply not ready %lld\n", ktime_to_ms(ktime_get()));
@@ -688,7 +686,7 @@ static void dock_switch_work_func_fix(struct work_struct *work)
     // PATERN_INTERIM should be replaced by correct
     //
     mutex_lock(&ds->lock);
-    val = wait_for_stable_signal(ds->dock_pin, DEBOUNCE_INTERIM + PATERN_INTERIM, 0);
+    val = wait_for_stable_signal(ds->dock_pin, DEBOUNCE_INTERIM + PATERN_INTERIM, (e_dock_type_smart == ds->dock_type)?(volatile int *)&ds->vbus_supplied:0);
     val = pulses2freq(val, PATERN_INTERIM);
     pr_notice("%d HZ %lld\n", val, ktime_to_ms(ktime_get()));
 
@@ -707,6 +705,7 @@ static void dock_switch_work_func_fix(struct work_struct *work)
         }
 
         allow_ufp = 0; 
+        ufp_only = 0;
         prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
         power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
         fd = sys_open("/proc/mcu_version", O_WRONLY, 0);
@@ -719,8 +718,8 @@ static void dock_switch_work_func_fix(struct work_struct *work)
     } else {
         pr_notice("stm32/k20 attached %lld\n", ktime_to_ms(ktime_get()));
         if (val > SC_BAS_HI) {
-            if (val > SC_ENH_NBP + 1000) {
-                pr_notice("k20 start patern %lld\n", ktime_to_ms(ktime_get())); 
+            if (val > SC_ENH_NBP + 2000) {
+                pr_notice("k20 start patern, dual-role usb %lld\n", ktime_to_ms(ktime_get())); 
                 val = (SWITCH_DOCK | SWITCH_EDOCK); 
                 ds->dock_type = e_dock_type_smart;
                 if (allow_ufp) {
@@ -731,7 +730,14 @@ static void dock_switch_work_func_fix(struct work_struct *work)
                     power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
                     msleep(500);
                 }
-            } else if (val > SC_ENH_NBP - 400 && val < SC_ENH_NBP + 1000) {
+                ufp_only = 0;
+            } else if (val > SC_ENH_NBP + 500) {
+                pr_notice("k20 start patern, poriferal usb %lld\n", ktime_to_ms(ktime_get())); 
+                val = (SWITCH_DOCK | SWITCH_EDOCK); 
+                ds->dock_type = e_dock_type_smart;
+                ufp_only = 1;
+                allow_ufp = 0;
+            } else if (val > SC_ENH_NBP - 400 && val < SC_ENH_NBP + 500) {
                 if (allow_ufp) {
                     pr_notice("k20 cancel usb bypass back to dfp %lld\n", ktime_to_ms(ktime_get()));
                     allow_ufp = 0; 
@@ -827,7 +833,7 @@ static void dock_switch_work_func_fix(struct work_struct *work)
             }
             prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
         } else {
-            if (allow_ufp) {
+            if (allow_ufp || ufp_only) {
                 prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN; 
             } else {
                 prop.intval = POWER_SUPPLY_SCOPE_SYSTEM;

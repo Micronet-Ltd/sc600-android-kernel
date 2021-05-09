@@ -2654,6 +2654,8 @@ static int smblib_recover_from_soft_jeita(struct smb_charger *chg)
 
 	if ((chg->jeita_status && !(stat7 & BAT_TEMP_STATUS_SOFT_LIMIT_MASK) &&
 		((stat1 & BATTERY_CHARGER_STATUS_MASK) == TERMINATE_CHARGE))) {
+
+        pr_notice("%s: temperature restored - enable charging\n", chg->name);
 		/*
 		 * We are moving from JEITA soft -> Normal and charging
 		 * is terminated

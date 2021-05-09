@@ -40,7 +40,7 @@
 		#include "qg-batterydata-mlp356477-2800mah.dtsi"*/
 		#include "batterydata-fullymax-fb382030xl-c801-4v2-135mah_20k.dtsi"
 		#include "batterydata-hwe30100100_2p-c801-4v2-6600mah_10k.dtsi"
-		/*#include "batterydata-scap-c801-4v2-135mah_30k.dtsi"*/
+		#include "batterydata-scap-c801-4v2-135mah_30k.dtsi"
 	};
 };
 

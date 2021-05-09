@@ -1,4 +1,4 @@
-/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,18 +10,15 @@
  * GNU General Public License for more details.
  */
 
-qcom,c801_fullymax_fb382030xl_4v2_135mah_20k {
-	/* #batterydata-fullymax-fb382030xl-c801-4v2-135mah_20k_PMI632_averaged_MasterSlave_Apr26th2021*/
+qcom,c801_scap_4v2_135mah_30k {
+	/* #batterydata-scap-c801-4v2-135mah_30k_FG_averaged_MasterSlave_Apr8th2020*/
 	qcom,max-voltage-uv = <4200000>;
 	qcom,fg-cc-cv-threshold-uv = <4190000>;
 	qcom,fastchg-current-ma = <130>;
-	/*qcom,batt-id-kohm = <17>;*/
-	/*qcom,battery-beta = <3435>;*/
-	/*qcom,battery-therm-kohm = <17>;*/
-	qcom,batt-id-kohm = <100>; /* temporary for investigation */
-	qcom,battery-beta = <3440>;
+	qcom,batt-id-kohm = <23>;
+	qcom,battery-beta = <3435>;
 	qcom,battery-therm-kohm = <47>;
-	qcom,battery-type = "c801_fullymax_fb382030xl_4v2_135mah_20k";
+	qcom,battery-type = "c801_scap_4v2_135mah_30k";
 	qcom,qg-batt-profile-ver = <100>;
 
 	qcom,jeita-fcc-ranges = <0   100  90000

@@ -15,10 +15,9 @@ qcom,c801_hwe30100100_2p_4v2_6600mah_10k {
 	qcom,max-voltage-uv = <4200000>;
 	qcom,fg-cc-cv-threshold-uv = <4190000>;
 	qcom,fastchg-current-ma = <2000>;
-	/*qcom,batt-id-kohm = <9>;*/
 	/*qcom,battery-beta = <3435>;*/
 	/*qcom,battery-therm-kohm = <10>;*/
-	qcom,batt-id-kohm = <100>; /* temporary for investigation */
+	qcom,batt-id-kohm = <9>;
 	qcom,battery-beta = <3440>;
 	qcom,battery-therm-kohm = <47>;
 	qcom,battery-type = "c801_hwe30100100_2p_4v2_6600mah_10k";

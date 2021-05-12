@@ -2830,6 +2830,8 @@ static void smblib_eval_chg_termination(struct smb_charger *chg, u8 batt_status)
 	 * to prevent overcharing.
 	 */
 	if ((batt_status == TERMINATE_CHARGE) && (pval.intval == 100)) {
+        pr_notice("charge done\n");
+
 		chg->cc_soc_ref = 0;
 		chg->last_cc_soc = 0;
 		alarm_start_relative(&chg->chg_termination_alarm,

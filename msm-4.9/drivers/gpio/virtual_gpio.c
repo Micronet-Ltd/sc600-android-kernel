@@ -821,7 +821,7 @@ static int __init virtual_gpio_init(void)
         dev->gpiochip_out.set = virt_gpio_fix_out_set;
         dev->gpiochip_out.get = virt_gpio_fix_out_get;
         dev->virt_gpio_cradle_notifier.notifier_call = virt_gpio_cradle_callback;
-// BYU        cradle_register_notifier(&dev->virt_gpio_cradle_notifier);
+        cradle_register_notifier(&dev->virt_gpio_cradle_notifier);
     }
 	dev->gpiochip_out.base = -1;
 	dev->gpiochip_out.ngpio = 8;

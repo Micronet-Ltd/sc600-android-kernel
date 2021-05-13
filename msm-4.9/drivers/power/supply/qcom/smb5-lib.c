@@ -2654,6 +2654,8 @@ static int smblib_recover_from_soft_jeita(struct smb_charger *chg)
 
 	if ((chg->jeita_status && !(stat7 & BAT_TEMP_STATUS_SOFT_LIMIT_MASK) &&
 		((stat1 & BATTERY_CHARGER_STATUS_MASK) == TERMINATE_CHARGE))) {
+
+        pr_notice("%s: temperature restored - enable charging\n", chg->name);
 		/*
 		 * We are moving from JEITA soft -> Normal and charging
 		 * is terminated
@@ -2828,6 +2830,8 @@ static void smblib_eval_chg_termination(struct smb_charger *chg, u8 batt_status)
 	 * to prevent overcharing.
 	 */
 	if ((batt_status == TERMINATE_CHARGE) && (pval.intval == 100)) {
+        pr_notice("charge done\n");
+
 		chg->cc_soc_ref = 0;
 		chg->last_cc_soc = 0;
 		alarm_start_relative(&chg->chg_termination_alarm,
@@ -3033,6 +3037,7 @@ irqreturn_t icl_change_irq_handler(int irq, void *data)
 static void smblib_micro_usb_plugin(struct smb_charger *chg, bool vbus_rising)
 {
     smblib_dbg(chg, PR_INTERRUPT, "vbus rising %d\n", vbus_rising);
+    pr_notice("%s: vbus %s\n", __func__, (vbus_rising)?"rising":"dropping");
 	if (!vbus_rising) {
 		smblib_update_usb_type(chg);
 		smblib_notify_device_mode(chg, false);
@@ -3083,6 +3088,7 @@ void smblib_usb_plugin_hard_reset_locked(struct smb_charger *chg)
 	power_supply_changed(chg->usb_psy);
 	smblib_dbg(chg, PR_INTERRUPT, "IRQ: usbin-plugin %s\n",
 					vbus_rising ? "attached" : "detached");
+    pr_notice("%s: usb psy %s\n", __func__, (vbus_rising)?"attached":"detached");
 }
 
 #define PL_DELAY_MS	30000
@@ -3176,6 +3182,7 @@ void smblib_usb_plugin_locked(struct smb_charger *chg)
 	power_supply_changed(chg->usb_psy);
 	smblib_dbg(chg, PR_INTERRUPT, "IRQ: usbin-plugin %s\n",
 					vbus_rising ? "attached" : "detached");
+    pr_notice("%s: vbus psy %s\n", __func__, (vbus_rising)?"attached":"detached");
 }
 
 irqreturn_t usb_plugin_irq_handler(int irq, void *data)
@@ -3692,6 +3699,7 @@ irqreturn_t typec_state_change_irq_handler(int irq, void *data)
 
 	smblib_dbg(chg, PR_INTERRUPT, "IRQ: cc-state-change; Type-C %s detected\n",
 				smblib_typec_mode_name[chg->typec_mode]);
+    pr_notice("%s: %s\n", __func__, smblib_typec_mode_name[chg->typec_mode]);
 
 	power_supply_changed(chg->usb_psy);
 
@@ -3725,10 +3733,12 @@ irqreturn_t typec_attach_detach_irq_handler(int irq, void *data)
 		if (stat & SNK_SRC_MODE_BIT) {
 			chg->sink_src_mode = SRC_MODE;
             smblib_dbg(chg, PR_INTERRUPT, "sourcing the power\n");
+            pr_notice("%s: sourcing power\n", __func__);
 			typec_sink_insertion(chg);
 		} else {
 			chg->sink_src_mode = SINK_MODE;
             smblib_dbg(chg, PR_INTERRUPT, "sinking the power\n");
+            pr_notice("%s: sinking power\n", __func__);
 			typec_src_insertion(chg);
 		}
 

@@ -2231,7 +2231,7 @@
 		};
 		pwr_loss_mon {
 			pwr_loss_mon_active: pwr_loss_mon_active {
-				/*mux {
+				mux {
 					pins = "gpio98";
 					function = "gpio";
 				};
@@ -2240,11 +2240,11 @@
 					pins = "gpio98";
 					drive-strength = <2>;
 					bias-pull-down;
-				};*/
+				};
 			};
 
 			pwr_loss_mon_suspend: pwr_loss_mon_suspend {
-				/*mux {
+				mux {
 					pins = "gpio98";
 					function = "gpio";
 				};
@@ -2253,7 +2253,7 @@
 					pins = "gpio98";
 					drive-strength = <2>;
 					bias-pull-down;
-				};*/
+				};
 			};
 		};
 	};

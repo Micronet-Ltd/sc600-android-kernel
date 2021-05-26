@@ -91,14 +91,13 @@
 		pinctrl-names = "pwr_loss_mon_active", "pwr_loss_mon_suspend";
 		pinctrl-0 = <&pwr_loss_mon_active>;
 		pinctrl-1 = <&pwr_loss_mon_suspend>;
-		/* wait for board prototype */
-		/* mcn,pwr-loss-mon = <&tlmm 46 GPIO_ACTIVE_LOW>; */
+		mcn,pwr-loss-mon = <&tlmm 98 GPIO_ACTIVE_LOW>;
 		mcn,wan-off-delay = <0>;
 		mcn,wlan-off-delay = <0>;
 		mcn,plat-off-delay = <180000>;
 		interrupt-names = "pwr-loss";
-		/*interrupt-parent = <&tlmm>;
-		interrupts = <&tlmm 46 0>;*/
+		interrupt-parent = <&tlmm>;
+		interrupts = <&tlmm 98 0>;
 		status = "okay";
 	};
 

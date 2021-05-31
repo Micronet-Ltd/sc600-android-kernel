@@ -2115,14 +2115,12 @@
 		watchdog_pin {
 			watchdog_pin_active: watchdog_pin_active {
 				mux {
-					/*pins = "gpio6", "gpio63";*/
-					pins = "gpio33";
+					pins = "gpio21", "gpio99";
 					function = "gpio";
 				};
 
 				config {
-					/*pins = "gpio6", "gpio63";*/
-					pins = "gpio33";
+					pins = "gpio21", "gpio99";
 					drive-strength = <2>;
 					bias-disable;
 				};
@@ -2130,14 +2128,12 @@
 
 			watchdog_pin_suspend: watchdog_pin_suspend {
 				mux {
-					/*pins = "gpio6", "gpio63";*/
-					pins = "gpio33";
+					pins = "gpio21", "gpio99";
 					function = "gpio";
 				};
 
 				config {
-					/*pins = "gpio6", "gpio63";*/
-					pins = "gpio33";
+					pins = "gpio21", "gpio99";
 					drive-strength = <2>;
 					bias-disable;
 				};
@@ -2146,14 +2142,12 @@
 		dock {
 			dock_pins_active: dock_pins_active {
 				mux {
-					/*pins = "gpio12", "gpio36", "gpio47", "gpio97";*/
-					pins = "gpio36", "gpio97";
+					pins = "gpio18", "gpio36", "gpio19", "gpio97";
 					function = "gpio";
 				};
 
 				config {
-					/*pins = "gpio12", "gpio36", "gpio47", "gpio97";*/
-					pins = "gpio36", "gpio97";
+					pins = "gpio18", "gpio36", "gpio19", "gpio97";
 					drive-strength = <2>;
 					bias-pull-down;
 				};
@@ -2161,13 +2155,12 @@
 
 			dock_pin_suspend: dock_pin_suspend {
 				mux {
-					/*pins = "gpio12", "gpio36", "gpio47", "gpio97";*/
-					pins = "gpio36", "gpio97";
+					pins = "gpio18", "gpio36", "gpio19", "gpio97";
 					function = "gpio";
 				};
 
 				config {
-					/*pins = "gpio12", "gpio36", "gpio47", "gpio97";*/
+					/*pins = "gpio18", "gpio36", "gpio19", "gpio97";*/
 					pins = "gpio36", "gpio97";
 					drive-strength = <2>;
 					bias-pull-down;
@@ -2177,12 +2170,12 @@
 		hi_3w {
 			hi_3w_pins_active: hi_3w_pins_active {
 				mux {
-					pins = "gpio90", "gpio13", "gpio22";
+					pins = "gpio132", "gpio13", "gpio2";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio90", "gpio13", "gpio22";
+					pins = "gpio132", "gpio13", "gpio2";
 					drive-strength = <16>;
 					bias-pull-up;
 				};
@@ -2190,12 +2183,12 @@
 
 			hi_3w_pin_suspend: hi_3w_pin_suspend {
 				mux {
-					pins = "gpio90", "gpio13", "gpio22";
+					pins = "gpio132", "gpio13", "gpio2";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio90", "gpio13", "gpio22";
+					pins = "gpio132", "gpio13", "gpio2";
 					drive-strength = <2>;
 					bias-pull-down;
 				};
@@ -2204,34 +2197,34 @@
 
 		dev_info {
 			dev_info_active: dev_info_active {
-				/*mux {
-					pins = "gpio94", "gpio95", "gpio96";
+				mux {
+					pins = "gpio128", "gpio87", "gpio96";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio94", "gpio95", "gpio96";
+					pins = "gpio128", "gpio87", "gpio96";
 					drive-strength = <2>;
 					bias-disable;
-				};*/
+				};
 			};
 
 			dev_info_suspend: dev_info_suspend {
-				/*mux {
-					pins = "gpio94", "gpio95", "gpio96";
+				mux {
+					pins = "gpio128", "gpio87", "gpio96";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio94", "gpio95", "gpio96";
+					pins = "gpio128", "gpio87", "gpio96";
 					drive-strength = <2>;
 					bias-disable;
-				};*/
+				};
 			};
 		};
 		pwr_loss_mon {
 			pwr_loss_mon_active: pwr_loss_mon_active {
-				/*mux {
+				mux {
 					pins = "gpio98";
 					function = "gpio";
 				};
@@ -2240,11 +2233,11 @@
 					pins = "gpio98";
 					drive-strength = <2>;
 					bias-pull-down;
-				};*/
+				};
 			};
 
 			pwr_loss_mon_suspend: pwr_loss_mon_suspend {
-				/*mux {
+				mux {
 					pins = "gpio98";
 					function = "gpio";
 				};
@@ -2253,7 +2246,7 @@
 					pins = "gpio98";
 					drive-strength = <2>;
 					bias-pull-down;
-				};*/
+				};
 			};
 		};
 	};

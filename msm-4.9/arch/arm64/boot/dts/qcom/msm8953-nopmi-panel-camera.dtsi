@@ -68,7 +68,8 @@
 };
 
 &mdss_dsi1 {
-	status = "ok";
+	status = "disabled";
+/*	status = "ok";
 	qcom,dsi-pref-prim-pan = <&dsi_ili9881d_720p_dsi1_video>;
 	pinctrl-names = "mdss_default", "mdss_sleep";
 	pinctrl-0 = <&mdss_dsi1_active &mdss_te1_active>;
@@ -79,6 +80,7 @@
 	qcom,platform-te-gpio = <&tlmm 25 0>;
 	qcom,platform-reset-gpio = <&tlmm 87 0>;
 //	qcom,platform-bklight-en-gpio = <&tlmm 59 0>;
+*/
 };
 
 &dsi_ili9881d_720p_video {

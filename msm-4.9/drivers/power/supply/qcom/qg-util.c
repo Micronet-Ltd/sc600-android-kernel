@@ -328,7 +328,7 @@ int qg_get_battery_temp(struct qpnp_qg *chip, int *temp)
 	pr_debug("batt_temp = %lld meas = 0x%llx\n",
 			result.physical, result.measurement);
 
-	*temp = (int)result.physical;
+	*temp = 1000*(int)result.physical/2300;
 
 	return rc;
 }

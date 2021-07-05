@@ -80,7 +80,7 @@
 		pinctrl-0 = <&dev_info_active>;
 		pinctrl-1 = <&dev_info_suspend>;
 		mcn,board-id-0 = <&tlmm 128 GPIO_ACTIVE_LOW>;
-		mcn,board-id-1 = <&tlmm 86 GPIO_ACTIVE_LOW>;
+		mcn,board-id-1 = <&tlmm 87 GPIO_ACTIVE_LOW>;
 		mcn,board-id-2 = <&tlmm 96 GPIO_ACTIVE_LOW>; 
 		status = "okay";
 	};

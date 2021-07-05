@@ -437,6 +437,7 @@ static void do_msm_poweroff(void)
 	qpnp_pon_system_pwr_off(PON_POWER_OFF_SHUTDOWN);
 
 	halt_spmi_pmic_arbiter();
+    pr_notice("Bye bye...\n");
 	deassert_ps_hold();
 
 	msleep(10000);

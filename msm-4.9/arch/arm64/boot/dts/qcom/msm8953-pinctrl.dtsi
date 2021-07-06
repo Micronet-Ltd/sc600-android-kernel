@@ -2144,12 +2144,12 @@
 		watchdog_pin {
 			watchdog_pin_active: watchdog_pin_active {
 				mux {
-					pins = "gpio21", "gpio99";
+					pins = "gpio36", "gpio99";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio21", "gpio99";
+					pins = "gpio36", "gpio99";
 					drive-strength = <2>;
 					bias-disable;
 				};
@@ -2157,12 +2157,12 @@
 
 			watchdog_pin_suspend: watchdog_pin_suspend {
 				mux {
-					pins = "gpio21", "gpio99";
+					pins = "gpio36", "gpio99";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio21", "gpio99";
+					pins = "gpio36", "gpio99";
 					drive-strength = <2>;
 					bias-disable;
 				};
@@ -2171,12 +2171,12 @@
 		dock {
 			dock_pins_active: dock_pins_active {
 				mux {
-					pins = "gpio18", "gpio36", "gpio19";
+					pins = "gpio18", "gpio21", "gpio19";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio18", "gpio36", "gpio19";
+					pins = "gpio18", "gpio21", "gpio19";
 					drive-strength = <2>;
 					bias-pull-down;
 				};
@@ -2184,12 +2184,12 @@
 
 			dock_pin_suspend: dock_pin_suspend {
 				mux {
-					pins = "gpio18", "gpio36", "gpio19";
+					pins = "gpio18", "gpio21", "gpio19";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio18", "gpio36", "gpio19";
+					pins = "gpio18", "gpio21", "gpio19";
 					drive-strength = <2>;
 					bias-pull-down;
 				};

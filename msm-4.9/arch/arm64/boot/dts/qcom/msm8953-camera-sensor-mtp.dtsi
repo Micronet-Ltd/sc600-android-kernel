@@ -74,7 +74,7 @@
 		clock-names = "cam_src_clk", "cam_clk";
 		qcom,clock-rates = <19200000 0>;
 	};
-
+/*
 	eeprom1: qcom,eeprom@1 {
 		cell-index = <1>;
 		reg = <0x1>;
@@ -110,7 +110,7 @@
 		clock-names = "cam_src_clk", "cam_clk";
 		qcom,clock-rates = <24000000 0>;
 	};
-
+*/
 	eeprom2: qcom,eeprom@2 {
 		cell-index = <2>;
 		compatible = "qcom,eeprom";
@@ -194,7 +194,7 @@
 		clock-names = "cam_src_clk", "cam_clk";
 		qcom,clock-rates = <24000000 0>;
 	};
-/*Depth Camera*/
+/*Depth Camera
 	qcom,camera@1 {
 		cell-index = <1>;
 		compatible = "qcom,camera";
@@ -237,6 +237,7 @@
 		clock-names = "cam_src_clk", "cam_clk";
 		qcom,clock-rates = <24000000 0>;
 	};
+*/
 /*front Camera*/
 	qcom,camera@2 {
 		cell-index = <2>;

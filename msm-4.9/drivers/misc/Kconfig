@@ -829,4 +829,5 @@ source "drivers/misc/cxl/Kconfig"
 source "drivers/misc/dev_info/Kconfig"
 source "drivers/misc/hi_3w/Kconfig"
 source "drivers/misc/fpr_FingerprintCard/Kconfig"
+
 endmenu

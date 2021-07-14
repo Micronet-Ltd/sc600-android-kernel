@@ -2204,7 +2204,7 @@
 
 				config {
 					pins = "gpio132", "gpio13", "gpio2";
-					drive-strength = <16>;
+					drive-strength = <6>;
 					bias-pull-up;
 				};
 			};

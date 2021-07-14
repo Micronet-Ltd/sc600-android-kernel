@@ -1470,7 +1470,7 @@ static int dock_switch_probe(struct platform_device *pdev)
 
         err = of_get_named_gpio_flags(np, "mcn,mb-ind-pin", 0, (enum of_gpio_flags *)&ds->mb_ind_l);
         if (!gpio_is_valid(err)) {
-            pr_err("ivalid docking pin\n");
+            pr_err("invalid mb-ind pin\n");
             err = -1;
         }
         ds->mb_ind_pin = err;

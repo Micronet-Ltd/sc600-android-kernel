@@ -65,7 +65,7 @@
 
 	hi3w {
 		compatible = "mcn,hi-3w";
-		pinctrl-names = "hi_3w_pins_active", "hi_3w_pin_suspend";
+		pinctrl-names = "default", "sleep";
 		pinctrl-0 = <&hi_3w_pins_active>;
 		pinctrl-1 = <&hi_3w_pin_suspend>;
 		mcn,3w-clock-pin = <&tlmm 13 GPIO_ACTIVE_LOW>;

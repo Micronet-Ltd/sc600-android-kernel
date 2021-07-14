@@ -67,15 +67,34 @@ int hi_3w_tx_cmd(uint32_t *cmd, bool wait_for_response)
     int initial_val;
     int err = GENERAL_ERROR;
     int time_tresh;
+    struct pinctrl_state *pctls;
     //int i; 
 
     if (!hi_dev || !cmd) {
         return GENERAL_ERROR;
     }
 
+    //pinctrl_force_default(hi_dev->pctl)
+    pctls = pinctrl_lookup_state(hi_dev->pctl, "default");
+    if (IS_ERR(pctls)) {
+        dev_err(hi_dev->pdev, "failure to get pinctrl active state\n");
+        return PTR_ERR(pctls);
+    }
+    //set the pins as active
+    err = pinctrl_select_state(hi_dev->pctl, pctls);
+    if (err) {
+        dev_err(hi_dev->pdev, "failure to set pinctrl active state\n");
+        return PTR_ERR(pctls);
+    }
+
     if (!gpio_is_valid(hi_dev->hi_3w_clock_pin) || !gpio_is_valid(hi_dev->hi_3w_mosi_pin) || !gpio_is_valid(hi_dev->hi_3w_miso_pin)) {
         pr_err("one of the gpio is invalid %d\n", *cmd);
-        return NOT_AVAILABLE;
+        return GENERAL_ERROR;
+    }
+    err = gpio_direction_output(hi_dev->hi_3w_clock_pin, 1);
+    if (err < 0) {
+        pr_err("failure to set direction of the gpio[%d]\n", hi_dev->hi_3w_clock_pin);
+        return GENERAL_ERROR;
     }
 
     //read the inital state of the input pin
@@ -253,7 +272,7 @@ static int hi_3w_probe(struct platform_device *pdev)
         }
 
         if (hi_dev->pctl) {
-            pctls = pinctrl_lookup_state(hi_dev->pctl, "hi_3w_pins_active");
+            pctls = pinctrl_lookup_state(hi_dev->pctl, "default");
             if (IS_ERR(pctls)) {
                 dev_err(dev, "failure to get pinctrl active state\n");
                 err = PTR_ERR(pctls);
@@ -318,7 +337,8 @@ static int hi_3w_probe(struct platform_device *pdev)
                 pr_err("failure to set direction of the gpio[%d]\n", hi_dev->hi_3w_clock_pin);
                 break;
             }
-            gpio_export(hi_dev->hi_3w_clock_pin, 0);
+
+            gpio_export(hi_dev->hi_3w_clock_pin, 1);
         }
 
         if (gpio_is_valid(hi_dev->hi_3w_mosi_pin)) {
@@ -333,7 +353,7 @@ static int hi_3w_probe(struct platform_device *pdev)
                 pr_err("failure to set direction of the gpio[%d]\n", hi_dev->hi_3w_mosi_pin);
                 break;
             }
-            gpio_export(hi_dev->hi_3w_mosi_pin, 0);
+            gpio_export(hi_dev->hi_3w_mosi_pin, 1);
         }
 
         if (gpio_is_valid(hi_dev->hi_3w_miso_pin)) {

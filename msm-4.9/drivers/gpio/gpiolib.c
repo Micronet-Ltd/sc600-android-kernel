@@ -2207,6 +2207,7 @@ int gpiod_direction_input(struct gpio_desc *desc)
 
 	VALIDATE_DESC(desc);
 	chip = desc->gdev->chip;
+//    pr_notice("%s: %s.%d\n", __func__, (desc->label)?desc->label:"unnamed", gpio_chip_hwgpio(desc));
 
 	if (!chip->get || !chip->direction_input) {
 		gpiod_warn(desc,
@@ -2230,6 +2231,7 @@ static int _gpiod_direction_output_raw(struct gpio_desc *desc, int value)
 	struct gpio_chip *gc = desc->gdev->chip;
 	int ret;
 
+//    pr_notice("%s: %s.%d[%d]\n", __func__, (desc->label)?desc->label:"unnamed", gpio_chip_hwgpio(desc), value);
 	/* GPIOs used for IRQs shall not be set as output */
 	if (test_bit(FLAG_USED_AS_IRQ, &desc->flags)) {
         gpiod_err(desc,

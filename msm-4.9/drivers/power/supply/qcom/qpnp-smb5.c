@@ -530,7 +530,9 @@ static int smb5_parse_dt(struct smb5 *chip)
 		if (rc) {
 			pr_err("failed to request ss-mux gpio rc=%d\n", rc);
 			//return rc;
-		}
+		} else {
+            gpio_export(chg->ssmux_gpio, 1);
+        }
 	}
 
 	return 0;

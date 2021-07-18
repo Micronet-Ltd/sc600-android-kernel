@@ -57,6 +57,7 @@
 		mcn,usb-switch-pin = <&tlmm 18 GPIO_ACTIVE_HIGH>;
 		/*mcn,otg-en-pin = <&tlmm 97 GPIO_ACTIVE_HIGH>;*/
 		mcn,mic-switch-pin = <&tlmm 19 GPIO_ACTIVE_HIGH>;
+		tuner-supply = <&pm8953_l10>;
 		interrupt-names = "cradle-detect";
 		interrupt-parent = <&tlmm>;
 		interrupts = <&tlmm 21 0>;

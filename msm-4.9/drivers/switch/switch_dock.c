@@ -22,6 +22,7 @@
 #include <linux/workqueue.h>
 #include <linux/pm_wakeup.h>
 
+#include <linux/regulator/consumer.h>
 #include <linux/notifier.h>
 #include <linux/power_supply.h>
 
@@ -117,6 +118,7 @@ struct dock_switch_device {
     struct  dock_switch_attr attr_outs_mask_set;
     struct  dock_switch_attr attr_outs_mask_clr;
     struct  dock_switch_attr attr_dbg_state;
+    struct  dock_switch_attr attr_tuner_state;
     //////////////barak/////////////////////
     struct  dock_switch_attr attr_J1708_en;
     struct  dock_switch_attr attr_rs485_en;
@@ -143,6 +145,7 @@ struct dock_switch_device {
     long long status_change_guard;
     int resuming;
     int vbus_supplied;
+    struct regulator *tuner_reg;
 };
 
 #include "../gpio/gpiolib.h"
@@ -862,7 +865,7 @@ static void dock_switch_work_func_fix(struct work_struct *work)
             __pm_stay_awake(&ds->wlock.ws);
             if (gpio_is_valid(ds->usb_switch_pin)) {
                 pr_notice("switch usb 44-pin connector %lld\n", ktime_to_ms(ktime_get()));
-                gpio_set_value(ds->usb_switch_pin, ds->usb_switch_l);
+                //gpio_set_value(ds->usb_switch_pin, ds->usb_switch_l);
             }
             if (gpio_is_valid(ds->mic_sw_pin)) {
                 pr_notice("switch mic_in1(mic4) to 44-pin connector %lld\n", ktime_to_ms(ktime_get()));
@@ -1211,6 +1214,47 @@ static ssize_t dock_switch_dbg_state_store(struct device *dev, struct device_att
     schedule_work(&ds->work);
 
     return err; 
+}
+
+static ssize_t dock_switch_tuner_state_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
+    struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
+
+    return sprintf(buf, "%d\n", (int)(!IS_ERR_OR_NULL(ds->tuner_reg)));
+}
+
+static ssize_t dock_switch_tuner_state_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
+    struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
+    int err, i;
+
+    err = kstrtos32(buf, 10, &i);
+
+    if (0 == err) {
+        if (i > 0) {
+            if (IS_ERR_OR_NULL(ds->tuner_reg)) 
+                ds->tuner_reg = devm_regulator_get_optional(ds->pdev, "tuner");
+
+            if (IS_ERR(ds->tuner_reg) && PTR_ERR(ds->tuner_reg) == -EPROBE_DEFER) {
+                /* regulators may not be ready, so retry again later */
+                ds->tuner_reg = 0;
+            } else {
+                err = regulator_set_voltage(ds->tuner_reg, 2800000, 2850000);
+                err = regulator_enable(ds->tuner_reg);
+            }
+        } else {
+            if (!IS_ERR_OR_NULL(ds->tuner_reg)) {
+                err = regulator_disable(ds->tuner_reg);
+                devm_regulator_put(ds->tuner_reg);
+            }
+            ds->tuner_reg = 0;
+        }
+    }
+
+
+    return count; 
 }
 
 static int gpc_lable_match(struct gpio_chip *gpc, void *lbl)
@@ -1667,6 +1711,15 @@ static int dock_switch_probe(struct platform_device *pdev)
         ds->attr_dbg_state.attr.store = dock_switch_dbg_state_store;
         sysfs_attr_init(&ds->attr_dbg_state.attr.attr);
         device_create_file((&ds->sdev)->dev, &ds->attr_dbg_state.attr);
+
+        ds->tuner_reg = 0;
+        snprintf(ds->attr_tuner_state.name, sizeof(ds->attr_dbg_state.name) - 1, "tuner_en");
+        ds->attr_tuner_state.attr.attr.name = ds->attr_tuner_state.name;
+        ds->attr_tuner_state.attr.attr.mode = S_IRUGO|S_IWUGO;
+        ds->attr_tuner_state.attr.show = dock_switch_tuner_state_show;
+        ds->attr_tuner_state.attr.store = dock_switch_tuner_state_store;
+        sysfs_attr_init(&ds->attr_tuner_state.attr.attr);
+        device_create_file((&ds->sdev)->dev, &ds->attr_tuner_state.attr);
 
         /////////////////////////////////////////////////////////////////////////////////////////////
 

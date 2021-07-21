@@ -834,7 +834,7 @@ static void dock_switch_work_func_fix(struct work_struct *work)
                     sys_close(fd);
                 }
             }
-            prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+            prop.intval = POWER_SUPPLY_SCOPE_DEVICE;
         } else {
             if (allow_ufp || ufp_only) {
                 prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN; 
@@ -865,7 +865,7 @@ static void dock_switch_work_func_fix(struct work_struct *work)
             __pm_stay_awake(&ds->wlock.ws);
             if (gpio_is_valid(ds->usb_switch_pin)) {
                 pr_notice("switch usb 44-pin connector %lld\n", ktime_to_ms(ktime_get()));
-                //gpio_set_value(ds->usb_switch_pin, ds->usb_switch_l);
+                gpio_set_value(ds->usb_switch_pin, ds->usb_switch_l);
             }
             if (gpio_is_valid(ds->mic_sw_pin)) {
                 pr_notice("switch mic_in1(mic4) to 44-pin connector %lld\n", ktime_to_ms(ktime_get()));

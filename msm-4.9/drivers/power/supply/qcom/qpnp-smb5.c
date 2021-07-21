@@ -925,12 +925,14 @@ static int smb5_usb_port_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TYPE:
 		val->intval = POWER_SUPPLY_TYPE_USB;
 		break;
-	case POWER_SUPPLY_PROP_ONLINE:
-		rc = smblib_get_prop_usb_online(chg, val);
-		if (!val->intval)
+    case POWER_SUPPLY_PROP_ONLINE:
+        rc = smblib_get_prop_usb_online(chg, val); 
+		if (!val->intval && !chg->pwr_brd_supply)
 			break;
 
-		if (((chg->typec_mode == POWER_SUPPLY_TYPEC_SOURCE_DEFAULT) ||
+        if (chg->otg_en == POWER_SUPPLY_SCOPE_DEVICE)
+            val->intval = 1;
+		else if (((chg->typec_mode == POWER_SUPPLY_TYPEC_SOURCE_DEFAULT) ||
 		   (chg->connector_type == POWER_SUPPLY_CONNECTOR_MICRO_USB))
 			&& (chg->real_charger_type == POWER_SUPPLY_TYPE_USB))
 			val->intval = 1;
@@ -944,7 +946,7 @@ static int smb5_usb_port_get_prop(struct power_supply *psy,
 		rc = smblib_get_prop_input_current_settled(chg, val);
 		break;
     case POWER_SUPPLY_PROP_SCOPE:
-        val->intval = chg->otg_en ? POWER_SUPPLY_SCOPE_SYSTEM : POWER_SUPPLY_SCOPE_UNKNOWN;
+        val->intval = chg->otg_en;
         break;
 	default:
 		pr_err_ratelimited("Get prop %d is not supported in pc_port\n",
@@ -960,6 +962,8 @@ static int smb5_usb_port_get_prop(struct power_supply *psy,
 	return 0;
 }
 
+//void smblib_handle_apsd_done(struct smb_charger *chg, bool rising);
+void typec_src_removal(struct smb_charger *chg);
 static int smb5_usb_port_set_prop(struct power_supply *psy,
 		enum power_supply_property psp,
 		const union power_supply_propval *val)
@@ -971,10 +975,27 @@ static int smb5_usb_port_set_prop(struct power_supply *psy,
 	switch (psp) {
     case POWER_SUPPLY_PROP_SCOPE:
         if (chg->otg_en != val->intval) {
+            int prev = chg->otg_en;
             chg->otg_en = val->intval;
-            vote(chg->awake_votable, OTG_DELAY_VOTER, 1, 0);
-            pr_notice("Scheduling power board connection\n");
-            schedule_delayed_work(&chg->uusb_otg_work, msecs_to_jiffies(chg->otg_delay_ms));
+            if (chg->otg_en == POWER_SUPPLY_SCOPE_DEVICE) {
+/*
+                chg->sink_src_mode = SINK_MODE;
+                smblib_handle_apsd_done(chg, 1);
+                rc = smblib_configure_hvdcp_apsd(chg, 1);
+                smblib_rerun_apsd_if_required(chg);
+                vote(chg->usb_icl_votable, DCP_VOTER, chg->dcp_icl_ua != -EINVAL, chg->dcp_icl_ua);
+                pr_notice("%s: sinking power\n", __func__);
+*/
+            } else if (prev == POWER_SUPPLY_SCOPE_DEVICE) {
+                typec_src_removal(chg);
+                chg->sink_src_mode = UNATTACHED_MODE;
+                chg->pwr_brd_supply = 0;
+            } else {
+                vote(chg->awake_votable, OTG_DELAY_VOTER, 1, 0); 
+                pr_notice("Scheduling power board connection\n");
+                schedule_delayed_work(&chg->uusb_otg_work, msecs_to_jiffies(chg->otg_delay_ms));
+            }
+            power_supply_changed(chg->usb_port_psy);
         }
         break;
 	default:

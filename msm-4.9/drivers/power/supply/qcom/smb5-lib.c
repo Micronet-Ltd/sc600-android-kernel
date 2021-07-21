@@ -293,34 +293,37 @@ static const struct apsd_result *smblib_get_apsd_result(struct smb_charger *chg)
 	u8 apsd_stat, stat;
 	const struct apsd_result *result = &smblib_apsd_results[UNKNOWN];
 
-	rc = smblib_read(chg, APSD_STATUS_REG, &apsd_stat);
-	if (rc < 0) {
-		smblib_err(chg, "Couldn't read APSD_STATUS rc=%d\n", rc);
-		return result;
-	}
-	smblib_dbg(chg, PR_REGISTER, "APSD_STATUS = 0x%02x\n", apsd_stat);
+    if (chg->pwr_brd_supply) {
+        result = &smblib_apsd_results[SDP];
+    } else {
+        rc = smblib_read(chg, APSD_STATUS_REG, &apsd_stat); 
+        if (rc < 0) {
+            smblib_err(chg, "Couldn't read APSD_STATUS rc=%d\n", rc);
+            return result;
+        }
+        smblib_dbg(chg, PR_REGISTER, "APSD_STATUS = 0x%02x\n", apsd_stat);
+        if (!(apsd_stat & APSD_DTC_STATUS_DONE_BIT))
+            return result;
 
-	if (!(apsd_stat & APSD_DTC_STATUS_DONE_BIT))
-		return result;
+        rc = smblib_read(chg, APSD_RESULT_STATUS_REG, &stat);
+        if (rc < 0) {
+            smblib_err(chg, "Couldn't read APSD_RESULT_STATUS rc=%d\n",
+                rc);
+            return result;
+        }
+        stat &= APSD_RESULT_STATUS_MASK;
 
-	rc = smblib_read(chg, APSD_RESULT_STATUS_REG, &stat);
-	if (rc < 0) {
-		smblib_err(chg, "Couldn't read APSD_RESULT_STATUS rc=%d\n",
-			rc);
-		return result;
-	}
-	stat &= APSD_RESULT_STATUS_MASK;
+        for (i = 0; i < ARRAY_SIZE(smblib_apsd_results); i++) {
+            if (smblib_apsd_results[i].bit == stat)
+                result = &smblib_apsd_results[i];
+        }
 
-	for (i = 0; i < ARRAY_SIZE(smblib_apsd_results); i++) {
-		if (smblib_apsd_results[i].bit == stat)
-			result = &smblib_apsd_results[i];
-	}
-
-	if (apsd_stat & QC_CHARGER_BIT) {
-		/* since its a qc_charger, either return HVDCP3 or HVDCP2 */
-		if (result != &smblib_apsd_results[HVDCP3])
-			result = &smblib_apsd_results[HVDCP2];
-	}
+        if (apsd_stat & QC_CHARGER_BIT) {
+            /* since its a qc_charger, either return HVDCP3 or HVDCP2 */
+            if (result != &smblib_apsd_results[HVDCP3])
+                result = &smblib_apsd_results[HVDCP2];
+        }
+    }
 
 	return result;
 }
@@ -3092,6 +3095,7 @@ void smblib_usb_plugin_hard_reset_locked(struct smb_charger *chg)
 }
 
 #define PL_DELAY_MS	30000
+static void smblib_handle_apsd_done(struct smb_charger *chg, bool rising);
 void smblib_usb_plugin_locked(struct smb_charger *chg)
 {
 	int rc;
@@ -3179,10 +3183,22 @@ void smblib_usb_plugin_locked(struct smb_charger *chg)
 	if (chg->connector_type == POWER_SUPPLY_CONNECTOR_MICRO_USB)
 		smblib_micro_usb_plugin(chg, vbus_rising);
 
-	power_supply_changed(chg->usb_psy);
+    power_supply_changed(chg->usb_psy); 
 	smblib_dbg(chg, PR_INTERRUPT, "IRQ: usbin-plugin %s\n",
 					vbus_rising ? "attached" : "detached");
     pr_notice("%s: vbus psy %s\n", __func__, (vbus_rising)?"attached":"detached");
+
+    if (vbus_rising && chg->otg_en == POWER_SUPPLY_SCOPE_DEVICE) {
+        chg->pwr_brd_supply = 1;
+        pr_notice("%s: sinking power\n", __func__);
+        chg->sink_src_mode = SINK_MODE;
+        smblib_handle_apsd_done(chg, 1);
+        rc = smblib_configure_hvdcp_apsd(chg, 1);
+        smblib_rerun_apsd_if_required(chg);
+        vote(chg->usb_icl_votable, DCP_VOTER, chg->dcp_icl_ua != -EINVAL, chg->dcp_icl_ua);
+        power_supply_changed(chg->usb_port_psy);
+    }
+    power_supply_changed(chg->usb_psy); 
 }
 
 irqreturn_t usb_plugin_irq_handler(int irq, void *data)
@@ -3538,7 +3554,7 @@ static void typec_sink_removal(struct smb_charger *chg)
 	}
 }
 
-static void typec_src_removal(struct smb_charger *chg)
+void typec_src_removal(struct smb_charger *chg)
 {
 	int rc;
 	struct smb_irq_data *data;

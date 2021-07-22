@@ -119,6 +119,7 @@ struct dock_switch_device {
     struct  dock_switch_attr attr_outs_mask_clr;
     struct  dock_switch_attr attr_dbg_state;
     struct  dock_switch_attr attr_tuner_state;
+    struct  dock_switch_attr attr_cam_ldos_state;
     //////////////barak/////////////////////
     struct  dock_switch_attr attr_J1708_en;
     struct  dock_switch_attr attr_rs485_en;
@@ -146,6 +147,11 @@ struct dock_switch_device {
     int resuming;
     int vbus_supplied;
     struct regulator *tuner_reg;
+    struct regulator *ldoa2_reg;
+    struct regulator *ldoa6_reg;
+    struct regulator *ldoa17_reg;
+    struct regulator *ldoa22_reg;
+    struct regulator *ldoa23_reg;
 };
 
 #include "../gpio/gpiolib.h"
@@ -1257,6 +1263,116 @@ static ssize_t dock_switch_tuner_state_store(struct device *dev, struct device_a
     return count; 
 }
 
+static ssize_t dock_switch_cam_ldos_state_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
+    struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
+
+    return sprintf(buf, "ldoa2[%d], ldoa6[%d], ldoa17[%d], ldoa22[%d], ldoa23[%d]\n",
+                   (int)(!IS_ERR_OR_NULL(ds->ldoa2_reg)),
+                   (int)(!IS_ERR_OR_NULL(ds->ldoa6_reg)),
+                   (int)(!IS_ERR_OR_NULL(ds->ldoa17_reg)),
+                   (int)(!IS_ERR_OR_NULL(ds->ldoa22_reg)),
+                   (int)(!IS_ERR_OR_NULL(ds->ldoa23_reg)));
+}
+
+static ssize_t dock_switch_cam_ldos_state_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
+    struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
+    int err, i;
+
+    err = kstrtos32(buf, 10, &i);
+
+    if (0 == err) {
+        if (i > 0) {
+            if (IS_ERR_OR_NULL(ds->ldoa2_reg)) 
+                ds->ldoa2_reg = devm_regulator_get_optional(ds->pdev, "ldoa2");
+
+            if (IS_ERR(ds->ldoa2_reg) && PTR_ERR(ds->ldoa2_reg) == -EPROBE_DEFER) {
+                /* regulators may not be ready, so retry again later */
+                ds->ldoa2_reg = 0;
+            } else {
+                err = regulator_set_voltage(ds->ldoa2_reg, 975000, 1175000);
+                err = regulator_enable(ds->ldoa2_reg);
+            }
+
+            if (IS_ERR_OR_NULL(ds->ldoa6_reg)) 
+                ds->ldoa6_reg = devm_regulator_get_optional(ds->pdev, "ldoa6");
+
+            if (IS_ERR(ds->ldoa6_reg) && PTR_ERR(ds->ldoa6_reg) == -EPROBE_DEFER) {
+                /* regulators may not be ready, so retry again later */
+                ds->ldoa6_reg = 0;
+            } else {
+                err = regulator_set_voltage(ds->ldoa6_reg, 1800000, 1800000);
+                err = regulator_enable(ds->ldoa6_reg);
+            }
+
+            if (IS_ERR_OR_NULL(ds->ldoa17_reg))
+                ds->ldoa17_reg = devm_regulator_get_optional(ds->pdev, "ldoa17");
+
+            if (IS_ERR(ds->ldoa17_reg) && PTR_ERR(ds->ldoa17_reg) == -EPROBE_DEFER) {
+                /* regulators may not be ready, so retry again later */
+                ds->ldoa17_reg = 0;
+            } else {
+                err = regulator_set_voltage(ds->ldoa17_reg, 3000000, 3300000);
+                err = regulator_enable(ds->ldoa17_reg);
+            }
+
+            if (IS_ERR_OR_NULL(ds->ldoa22_reg))
+                ds->ldoa22_reg = devm_regulator_get_optional(ds->pdev, "ldoa22");
+
+            if (IS_ERR(ds->ldoa22_reg) && PTR_ERR(ds->ldoa22_reg) == -EPROBE_DEFER) {
+                /* regulators may not be ready, so retry again later */
+                ds->ldoa22_reg = 0;
+            } else {
+                err = regulator_set_voltage(ds->ldoa22_reg, 2800000, 2800000);
+                err = regulator_enable(ds->ldoa22_reg);
+            }
+
+            if (IS_ERR_OR_NULL(ds->ldoa23_reg))
+                ds->ldoa23_reg = devm_regulator_get_optional(ds->pdev, "ldoa23");
+
+            if (IS_ERR(ds->ldoa23_reg) && PTR_ERR(ds->ldoa22_reg) == -EPROBE_DEFER) {
+                /* regulators may not be ready, so retry again later */
+                ds->ldoa23_reg = 0;
+            } else {
+                err = regulator_set_voltage(ds->ldoa23_reg, 975000, 1225000);
+                err = regulator_enable(ds->ldoa23_reg);
+            }
+        } else {
+            if (!IS_ERR_OR_NULL(ds->ldoa2_reg)) {
+                err = regulator_disable(ds->ldoa2_reg);
+                devm_regulator_put(ds->ldoa2_reg);
+            }
+            ds->ldoa2_reg = 0;
+            if (!IS_ERR_OR_NULL(ds->ldoa6_reg)) {
+                err = regulator_disable(ds->ldoa6_reg);
+                devm_regulator_put(ds->ldoa6_reg);
+            }
+            ds->ldoa6_reg = 0;
+            if (!IS_ERR_OR_NULL(ds->ldoa17_reg)) {
+                err = regulator_disable(ds->ldoa17_reg);
+                devm_regulator_put(ds->ldoa17_reg);
+            }
+            ds->ldoa17_reg = 0;
+            if (!IS_ERR_OR_NULL(ds->ldoa22_reg)) {
+                err = regulator_disable(ds->ldoa22_reg);
+                devm_regulator_put(ds->ldoa22_reg);
+            }
+            ds->ldoa22_reg = 0;
+            if (!IS_ERR_OR_NULL(ds->ldoa23_reg)) {
+                err = regulator_disable(ds->ldoa23_reg);
+                devm_regulator_put(ds->ldoa23_reg);
+            }
+            ds->ldoa23_reg = 0;
+        }
+    }
+
+
+    return count; 
+}
+
 static int gpc_lable_match(struct gpio_chip *gpc, void *lbl)
 {
 	return !strcmp(gpc->label, lbl);
@@ -1713,13 +1829,26 @@ static int dock_switch_probe(struct platform_device *pdev)
         device_create_file((&ds->sdev)->dev, &ds->attr_dbg_state.attr);
 
         ds->tuner_reg = 0;
-        snprintf(ds->attr_tuner_state.name, sizeof(ds->attr_dbg_state.name) - 1, "tuner_en");
+        snprintf(ds->attr_tuner_state.name, sizeof(ds->attr_tuner_state.name) - 1, "tuner_en");
         ds->attr_tuner_state.attr.attr.name = ds->attr_tuner_state.name;
         ds->attr_tuner_state.attr.attr.mode = S_IRUGO|S_IWUGO;
         ds->attr_tuner_state.attr.show = dock_switch_tuner_state_show;
         ds->attr_tuner_state.attr.store = dock_switch_tuner_state_store;
         sysfs_attr_init(&ds->attr_tuner_state.attr.attr);
         device_create_file((&ds->sdev)->dev, &ds->attr_tuner_state.attr);
+
+        ds->ldoa2_reg = 0;
+        ds->ldoa6_reg = 0;
+        ds->ldoa17_reg = 0;
+        ds->ldoa22_reg = 0;
+        ds->ldoa23_reg = 0;
+        snprintf(ds->attr_cam_ldos_state.name, sizeof(ds->attr_cam_ldos_state.name) - 1, "cam_ldos_en");
+        ds->attr_cam_ldos_state.attr.attr.name = ds->attr_cam_ldos_state.name;
+        ds->attr_cam_ldos_state.attr.attr.mode = S_IRUGO|S_IWUGO;
+        ds->attr_cam_ldos_state.attr.show = dock_switch_cam_ldos_state_show;
+        ds->attr_cam_ldos_state.attr.store = dock_switch_cam_ldos_state_store;
+        sysfs_attr_init(&ds->attr_cam_ldos_state.attr.attr);
+        device_create_file((&ds->sdev)->dev, &ds->attr_cam_ldos_state.attr);
 
         /////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -10,7 +10,7 @@
  * GNU General Public License for more details.
  */
 
-#define pr_fmt(fmt) "%s:%d " fmt, __func__, __LINE__
+#define pr_fmt(fmt) "%s: " fmt, __func__
 
 #include <linux/module.h>
 #include "msm_sd.h"
@@ -1931,7 +1931,7 @@ static int32_t msm_actuator_i2c_probe(struct i2c_client *client,
 	act_ctrl_t->msm_sd.sd.devnode->fops =
 		&msm_actuator_v4l2_subdev_fops;
 	act_ctrl_t->actuator_state = ACT_DISABLE_STATE;
-	pr_info("msm_actuator_i2c_probe: succeeded\n");
+	pr_notice("succeeded\n");
 	CDBG("Exit\n");
 
 	return 0;
@@ -2043,6 +2043,8 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 #endif
 	msm_actuator_t->msm_sd.sd.devnode->fops =
 		&msm_actuator_v4l2_subdev_fops;
+
+    pr_notice("succeeded\n");
 
 	CDBG("Exit\n");
 	return rc;

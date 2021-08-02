@@ -27,6 +27,9 @@
 #include <linux/delay.h>
 #include <linux/input/qpnp-power-on.h>
 #include <linux/of_address.h>
+#include <linux/gpio.h>
+#include <linux/of_platform.h>
+#include <linux/of_gpio.h>
 
 #include <asm/cacheflush.h>
 #include <asm/system_misc.h>
@@ -106,6 +109,9 @@ struct reset_attribute {
 
 module_param_call(download_mode, dload_set, param_get_int,
 			&download_mode, 0644);
+
+struct  pinctrl *pctl;
+int pwr_led_pin, pwr_led_l;
 
 static int panic_prep_restart(struct notifier_block *this,
 			      unsigned long event, void *ptr)
@@ -422,6 +428,9 @@ static void do_msm_restart(enum reboot_mode reboot_mode, const char *cmd)
 
 	scm_disable_sdi();
 	halt_spmi_pmic_arbiter();
+    if (gpio_is_valid(pwr_led_pin)) {
+        gpio_set_value(pwr_led_pin, pwr_led_l^1);
+    }
 	pr_notice("Bye bye...\n");
 	deassert_ps_hold();
 
@@ -437,6 +446,9 @@ static void do_msm_poweroff(void)
 	qpnp_pon_system_pwr_off(PON_POWER_OFF_SHUTDOWN);
 
 	halt_spmi_pmic_arbiter();
+    if (gpio_is_valid(pwr_led_pin)) {
+        gpio_set_value(pwr_led_pin, pwr_led_l^1);
+    }
     pr_notice("Bye bye...\n");
 	deassert_ps_hold();
 
@@ -582,7 +594,8 @@ static int msm_restart_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct resource *mem;
 	struct device_node *np;
-	int ret = 0;
+    struct pinctrl_state *pctls;
+	int ret = 0, err = 0;
 
 #ifdef CONFIG_QCOM_DLOAD_MODE
 	if (scm_is_call_available(SCM_SVC_BOOT, SCM_DLOAD_CMD) > 0)
@@ -656,7 +669,58 @@ static int msm_restart_probe(struct platform_device *pdev)
 	}
 skip_sysfs_create:
 #endif
-	np = of_find_compatible_node(NULL, NULL,
+    pctl = devm_pinctrl_get(dev);
+    if (IS_ERR(pctl)) {
+        if (PTR_ERR(pctl) == -EPROBE_DEFER) {
+            dev_err(dev, "pin ctl critical error!\n");
+        }
+
+        dev_notice(dev, "pin control isn't used\n");
+        pctl = 0;
+    } else {
+        dev_notice(dev, "using pin control\n");
+    }
+
+    if (pctl) {
+        pctls = pinctrl_lookup_state(pctl, "pwr_led_active");
+        if (IS_ERR(pctls)) {
+            dev_err(dev, "failure to get pinctrl active state\n");
+        } else {
+            //set the pins as active
+            if (pinctrl_select_state(pctl, pctls)) {
+                dev_err(dev, "failure to set pinctrl active state\n");
+            } else {
+                dev_notice(dev, "pwr_led_active selected\n");
+            }
+        }
+    }
+
+    np = dev->of_node;
+    err = of_get_named_gpio_flags(np, "mcn,pwr-led", 0, (enum of_gpio_flags *)&pwr_led_l);
+    if (!gpio_is_valid(err)) {
+        dev_err(dev, "invalid pwr led pin\n");
+        pwr_led_pin = -1;
+    } else {
+        pwr_led_pin = err;
+        pwr_led_l = !pwr_led_l;
+        dev_notice(dev, "3-wire mosi active level %s\n", (pwr_led_l)? "high" : "low");
+    }
+
+    if (gpio_is_valid(pwr_led_pin)) {
+        //Configure the mosi pin as output
+        err = devm_gpio_request(dev, pwr_led_pin, "pwr-led");
+        if (err < 0) {
+            dev_err(dev, "failure to get the gpio[%d]\n", pwr_led_pin);
+        } else {
+            err = gpio_direction_output(pwr_led_pin, pwr_led_l);
+            if (err < 0) {
+                dev_err(dev, "failure to set direction of the gpio[%d]\n", pwr_led_pin);
+            }
+            gpio_export(pwr_led_pin, 1);
+        }
+    }
+
+    np = of_find_compatible_node(NULL, NULL,
 				"qcom,msm-imem-restart_reason");
 	if (!np) {
 		pr_err("unable to find DT imem restart reason node\n");

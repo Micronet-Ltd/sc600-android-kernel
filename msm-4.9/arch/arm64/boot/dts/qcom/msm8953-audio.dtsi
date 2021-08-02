@@ -169,7 +169,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		wsa881x_i2c_f: wsa881x-i2c-codec@f {
-			status = "okay";
+			status = "disabled";
 			compatible = "qcom,wsa881x-i2c-codec";
 			reg = <0x0f>;
 			qcom,wsa-analog-vi-gpio = <&wsa881x_analog_vi_gpio>;
@@ -178,7 +178,7 @@
 				<&wsa881x_analog_reset_gpio>;
 		};
 		wsa881x_i2c_45: wsa881x-i2c-codec@45 {
-			status = "okay";
+			status = "disabled";
 			compatible = "qcom,wsa881x-i2c-codec";
 			reg = <0x45>;
 		};

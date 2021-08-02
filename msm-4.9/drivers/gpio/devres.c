@@ -326,6 +326,7 @@ int devm_gpio_request(struct device *dev, unsigned gpio, const char *label)
 	unsigned *dr;
 	int rc;
 
+    pr_notice("%s: %s.%s.%d\n", __func__, (dev->driver && dev->driver->name)?dev->driver->name:"uncknown", (label)?label:"unnamed", gpio);
 	dr = devres_alloc(devm_gpio_release, sizeof(unsigned), GFP_KERNEL);
 	if (!dr)
 		return -ENOMEM;

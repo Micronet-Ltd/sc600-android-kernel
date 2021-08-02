@@ -24,6 +24,12 @@
 	qcom,pmic-name = "PMI632";
 };
 
+&pm8953_l17 {
+	regulator-min-microvolt = <3000000>;
+	regulator-max-microvolt = <3300000>;
+	qcom,init-voltage = <3000000>;
+};
+
 &soc {
 	virtual_leds {
 		compatible = "virtual-leds-fixed";
@@ -57,6 +63,12 @@
 		mcn,usb-switch-pin = <&tlmm 18 GPIO_ACTIVE_HIGH>;
 		/*mcn,otg-en-pin = <&tlmm 97 GPIO_ACTIVE_HIGH>;*/
 		mcn,mic-switch-pin = <&tlmm 19 GPIO_ACTIVE_HIGH>;
+		tuner-supply = <&pm8953_l10>;
+		ldoa2-supply = <&pm8953_l2>;
+		ldoa6-supply = <&pm8953_l6>;
+		ldoa17-supply = <&pm8953_l17>;
+		ldoa22-supply = <&pm8953_l22>;
+		ldoa23-supply = <&pm8953_l23>;
 		interrupt-names = "cradle-detect";
 		interrupt-parent = <&tlmm>;
 		interrupts = <&tlmm 21 0>;
@@ -65,7 +77,7 @@
 
 	hi3w {
 		compatible = "mcn,hi-3w";
-		pinctrl-names = "hi_3w_pins_active", "hi_3w_pin_suspend";
+		pinctrl-names = "default", "sleep";
 		pinctrl-0 = <&hi_3w_pins_active>;
 		pinctrl-1 = <&hi_3w_pin_suspend>;
 		mcn,3w-clock-pin = <&tlmm 13 GPIO_ACTIVE_LOW>;

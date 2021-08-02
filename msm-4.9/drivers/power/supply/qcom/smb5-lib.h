@@ -385,7 +385,7 @@ struct smb_charger {
 	bool			is_hdc;
 	bool			chg_done;
 	int			connector_type;
-	bool			otg_en;
+	int			otg_en;
 	bool			suspend_input_on_debug_batt;
 	int			default_icl_ua;
 	int			otg_cl_ua;
@@ -443,6 +443,7 @@ struct smb_charger {
 	/*typec ssmux jeffery add*/
 	int 			ssmux_gpio;
 	enum of_gpio_flags gpio_flag;
+    int pwr_brd_supply;
 };
 
 int smblib_read(struct smb_charger *chg, u16 addr, u8 *val);

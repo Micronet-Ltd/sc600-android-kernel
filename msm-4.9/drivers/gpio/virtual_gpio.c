@@ -545,6 +545,10 @@ static void virt_gpio_mcu_set(struct gpio_chip *chip, unsigned offset, int value
 	struct virt_gpio *dev = g_pvpgio;
 	int port, bit_index;
 
+    if (!dev->cradle_attached || (dev->cradle_attached & 0x10)) {
+        return;
+    }
+
 	port = (offset >> 5);		 
 	bit_index = (offset & 31u); 
 
@@ -576,7 +580,10 @@ static int virt_gpio_mcu_get(struct gpio_chip *chip, unsigned offset)
 	struct virt_gpio *dev = g_pvpgio;
 	unsigned int port, bit_index, ret;
 
-	port = (offset >> 5);		// dividing by 32
+    if (!dev->cradle_attached || (dev->cradle_attached & 0x10)) {
+        return 0;
+    }
+    port = (offset >> 5);       // dividing by 32
 	bit_index = (offset & 31u); // modolu 32
 
 	DEFINE_LOCK_FLAGS(flags); // make last
@@ -810,7 +817,7 @@ static int __init virtual_gpio_init(void)
 		return ret;
 	}
 
-	dev->gpiochip_out.label = "vgpio_out"; //virtgpio
+    dev->gpiochip_out.label = "vgpio_out"; //virtgpio
 	dev->gpiochip_out.request = virt_gpio_out_request;
 	dev->gpiochip_out.free = virt_gpio_out_free;
 	dev->gpiochip_out.direction_output = virt_gpio_direction_output;
@@ -857,16 +864,16 @@ static int __init virtual_gpio_init(void)
 	gpiochip_add(&dev->gpiochip_in);
 	pr_debug("in base %d\n", dev->gpiochip_in.base);
 
-	gpiochip_add(&dev->gpiochip_mcu);
-	pr_notice("in base %d\n", dev->gpiochip_mcu.base);
+    gpiochip_add(&dev->gpiochip_mcu);
+    pr_notice("in base %d\n", dev->gpiochip_mcu.base);
 
     gpio_in_notify(0, 0);
-//
+
 	ret = sysfs_create_group(&vgpio_dev.this_device->kobj, &in_attr_group);
 	if (ret) {
 		pr_err("%s: could not create sysfs group [%d]\n", __func__, ret);
 	}
-//
+
 	return 0;
 }
 

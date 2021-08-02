@@ -12,6 +12,8 @@
  * GNU General Public License for more details.
  */
 
+#define pr_fmt(fmt) "%s: " fmt, __func__
+
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/io.h>
@@ -149,7 +151,7 @@ static int msm_pinmux_set_mux(struct pinctrl_dev *pctldev,
 	struct msm_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 	const struct msm_pingroup *g;
 	unsigned long flags;
-	u32 val, mask;
+	u32 val, val2, mask;
 	int i;
 
 	g = &pctrl->soc->groups[group];
@@ -165,12 +167,15 @@ static int msm_pinmux_set_mux(struct pinctrl_dev *pctldev,
 
 	spin_lock_irqsave(&pctrl->lock, flags);
 
-	val = readl(pctrl->regs + g->ctl_reg);
+	val2 = val = readl(pctrl->regs + g->ctl_reg);
 	val &= ~mask;
 	val |= i << g->mux_bit;
 	writel(val, pctrl->regs + g->ctl_reg);
 
 	spin_unlock_irqrestore(&pctrl->lock, flags);
+    if (val2 != val) {
+        //pr_notice("%s: replace mux %x by %x\n", (g->name)?g->name:"unnamed", val2, val); 
+    }
 
 	return 0;
 }
@@ -297,7 +302,7 @@ static int msm_config_group_set(struct pinctrl_dev *pctldev,
 	unsigned arg;
 	unsigned bit;
 	int ret;
-	u32 val;
+	u32 val, val2;
 	int i;
 
 	g = &pctrl->soc->groups[group];
@@ -362,11 +367,14 @@ static int msm_config_group_set(struct pinctrl_dev *pctldev,
 		}
 
 		spin_lock_irqsave(&pctrl->lock, flags);
-		val = readl(pctrl->regs + g->ctl_reg);
+		val2 = val = readl(pctrl->regs + g->ctl_reg);
 		val &= ~(mask << bit);
 		val |= arg << bit;
 		writel(val, pctrl->regs + g->ctl_reg);
 		spin_unlock_irqrestore(&pctrl->lock, flags);
+        if (val2 != val) {
+            //pr_notice("%s: replace mux %x by %x\n", (g->name)?g->name:"unnamed", val2, val); 
+        }
 	}
 
 	return 0;
@@ -390,17 +398,21 @@ static int msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
 	const struct msm_pingroup *g;
 	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
 	unsigned long flags;
-	u32 val;
+	u32 val, val2, val3;
 
 	g = &pctrl->soc->groups[offset];
 
 	spin_lock_irqsave(&pctrl->lock, flags);
 
-	val = readl(pctrl->regs + g->ctl_reg);
+	val2 = val = readl(pctrl->regs + g->ctl_reg);
 	val &= ~BIT(g->oe_bit);
 	writel(val, pctrl->regs + g->ctl_reg);
+    val3 = readl(pctrl->regs + g->ctl_reg);
 
 	spin_unlock_irqrestore(&pctrl->lock, flags);
+    if (val != val2) {
+        //pr_notice("%s: replace mux %x by %x[%x]\n", (g->name)?g->name:"unnamed", val2, val, val3); 
+    }
 
 	return 0;
 }
@@ -410,24 +422,32 @@ static int msm_gpio_direction_output(struct gpio_chip *chip, unsigned offset, in
 	const struct msm_pingroup *g;
 	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
 	unsigned long flags;
-	u32 val;
+	u32 val, val2, val3, val4, val5;
 
 	g = &pctrl->soc->groups[offset];
 
 	spin_lock_irqsave(&pctrl->lock, flags);
 
-	val = readl(pctrl->regs + g->io_reg);
+	val2 = val = readl(pctrl->regs + g->io_reg);
 	if (value)
 		val |= BIT(g->out_bit);
 	else
 		val &= ~BIT(g->out_bit);
+    val3 = val;
 	writel(val, pctrl->regs + g->io_reg);
 
-	val = readl(pctrl->regs + g->ctl_reg);
+	val4 = val = readl(pctrl->regs + g->ctl_reg);
 	val |= BIT(g->oe_bit);
+    val5 = val;
 	writel(val, pctrl->regs + g->ctl_reg);
 
 	spin_unlock_irqrestore(&pctrl->lock, flags);
+    if (val2 != val3) {
+        //pr_notice("%s: replace direction %x by %x\n", (g->name)?g->name:"unnamed", val2, val3); 
+    }
+    if (val4 != val5) {
+        //pr_notice("%s: replace mux %x by %x\n", (g->name)?g->name:"unnamed", val4, val5); 
+    }
 
 	return 0;
 }

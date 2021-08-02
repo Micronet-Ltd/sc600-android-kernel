@@ -2718,6 +2718,8 @@ static void dwc3_resume_work(struct work_struct *w)
 					ORIENTATION_CC2 : ORIENTATION_CC1;
 
 		dbg_event(0xFF, "cc_state", mdwc->typec_orientation);
+        dev_notice(mdwc->dev, "%s speed, orientation cc%d\n",
+                   (dwc->maximum_speed == USB_SPEED_SUPER)?"super":"high", (int)mdwc->typec_orientation);
 	}
 
 	/*
@@ -3001,7 +3003,7 @@ static void check_for_sdp_connection(struct work_struct *w)
 	/* floating D+/D- lines detected */
 	if (dwc->gadget.state < USB_STATE_DEFAULT &&
 		dwc3_gadget_get_link_state(dwc) != DWC3_LINK_STATE_CMPLY) {
-		mdwc->vbus_active = 0;
+		//mdwc->vbus_active = 0;
 		dbg_event(0xFF, "Q RW SPD CHK", mdwc->vbus_active);
 		queue_work(mdwc->dwc3_wq, &mdwc->resume_work);
 	}
@@ -4353,9 +4355,12 @@ static int dwc3_msm_gadget_vbus_draw(struct dwc3_msm *mdwc, unsigned int mA)
 	if (mdwc->max_power == mA || psy_type != POWER_SUPPLY_TYPE_USB)
 		return 0;
 
-	dev_info(mdwc->dev, "Avail curr from USB = %u\n", mA);
+	dev_notice(mdwc->dev, "draw from USB = %u\n", mA);
 	/* Set max current limit in uA */
-	pval.intval = 1000 * mA;
+    if (mdwc->vbus_active && mA < 100) {
+        mA = 900;
+    }
+    pval.intval = 1000 * mA; 
 
 set_prop:
 	ret = power_supply_set_property(mdwc->usb_psy,

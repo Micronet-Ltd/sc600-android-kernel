@@ -796,7 +796,7 @@ static int pn54x_remove(struct i2c_client *client)
 static struct of_device_id pn54x_dt_match[] = {
 	{ .compatible = "nxp,pn547", },
 	{ .compatible = "qcom,pn544", },
-	{},
+	{ .compatible = "qcom,pn548",},
 };
 MODULE_DEVICE_TABLE(of, pn54x_dt_match);
 #endif
@@ -804,6 +804,7 @@ MODULE_DEVICE_TABLE(of, pn54x_dt_match);
 static const struct i2c_device_id pn54x_id[] = {
 	{ "pn547", 0 },
 	{ "pn544", 0 },
+	{ "pn548", 0 },
 };
 MODULE_DEVICE_TABLE(i2c, pn54x_id);
 

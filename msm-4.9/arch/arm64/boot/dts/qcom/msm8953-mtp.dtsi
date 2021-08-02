@@ -225,30 +225,34 @@
 */
 
 
+	pn548@28 {
+		compatible = "qcom,pn548";
+		reg = <0x28>;
+
+	qcom,nxq-irq = <&tlmm 90 0x00>;
+	qcom,nxq-ven = <&tlmm 9 0x00>;
+	qcom,nq-firm = <&tlmm 8 0x00>;
+	qcom,nq-clkreq = <&pm8953_gpios 2 0x00>;
+//	qcom,nq-esepwr = <&tlmm 141 0x00>;
+	interrupt-parent = <&tlmm>;
+	qcom,clk-src = "BBCLK2";
+	interrupts = <90 0>;
+	interrupt-names = "nfc_irq";
+	pinctrl-names = "nfc_active", "nfc_suspend";
+//	pinctrl-0 = <&nfc_int_active &nfc_disable_active &nfc_clk_default>;
+	pinctrl-0 = <&nfc_int_active &nfc_disable_active>;
+
+	pinctrl-1 = <&nfc_int_suspend &nfc_disable_suspend>;
+	clocks = <&clock_gcc clk_bb_clk2_pin>;
+	clock-names = "ref_clk";
+		status = "ok";
+	};
+
+
 };
 
 &i2c_5 { /* BLSP2 QUP1 (NFC) */
 	status = "disabled";
-/*
-	pn548@28 {
-		compatible = "qcom,pn548";
-		reg = <0x28>;
-		qcom,nxq-irq = <&msm_gpio 90 0x00>;
-		qcom,nxq-ven = <&msm_gpio 9 0x00>;
-		//qcom,nq-firm = <&msm_gpio 62 0x00>;
-		//qcom,nq-clkreq = <&pm8953_gpios 2 0x00>;
-		interrupt-parent = <&msm_gpio>;
-		//qcom,clk-src = "BBCLK2";
-		interrupts = <90 0>;
-		interrupt-names = "nfc_irq";
-		pinctrl-names = "nfc_active", "nfc_suspend";
-		pinctrl-0 = <&nfc_int_active &nfc_disable_active>;
-		pinctrl-1 = <&nfc_int_suspend &nfc_disable_suspend>;
-		//clocks = <&clock_gcc clk_bb_clk2_pin>;
-		//clock-names = "ref_clk";
-		//status = "disabled";
-	};
-*/
 };
 
 &sdhc_1 {

@@ -1276,6 +1276,94 @@ static ssize_t dock_switch_cam_ldos_state_show(struct device *dev, struct device
                    (int)(!IS_ERR_OR_NULL(ds->ldoa23_reg)));
 }
 
+void en_all_cam_ldos(struct dock_switch_device *ds, int en)
+{
+    int err = 0;
+
+    if (en > 0) {
+        if (IS_ERR_OR_NULL(ds->ldoa2_reg)) 
+            ds->ldoa2_reg = devm_regulator_get_optional(ds->pdev, "ldoa2");
+
+        if (IS_ERR(ds->ldoa2_reg) && PTR_ERR(ds->ldoa2_reg) == -EPROBE_DEFER) {
+            /* regulators may not be ready, so retry again later */
+            ds->ldoa2_reg = 0;
+        } else {
+            err = regulator_set_voltage(ds->ldoa2_reg, 975000, 1175000);
+            err = regulator_enable(ds->ldoa2_reg);
+        }
+
+        if (IS_ERR_OR_NULL(ds->ldoa6_reg)) 
+            ds->ldoa6_reg = devm_regulator_get_optional(ds->pdev, "ldoa6");
+
+        if (IS_ERR(ds->ldoa6_reg) && PTR_ERR(ds->ldoa6_reg) == -EPROBE_DEFER) {
+            /* regulators may not be ready, so retry again later */
+            ds->ldoa6_reg = 0;
+        } else {
+            err = regulator_set_voltage(ds->ldoa6_reg, 1800000, 1800000);
+            err = regulator_enable(ds->ldoa6_reg);
+        }
+
+        if (IS_ERR_OR_NULL(ds->ldoa17_reg))
+            ds->ldoa17_reg = devm_regulator_get_optional(ds->pdev, "ldoa17");
+
+        if (IS_ERR(ds->ldoa17_reg) && PTR_ERR(ds->ldoa17_reg) == -EPROBE_DEFER) {
+            /* regulators may not be ready, so retry again later */
+            ds->ldoa17_reg = 0;
+        } else {
+            err = regulator_set_voltage(ds->ldoa17_reg, 3000000, 3300000);
+            err = regulator_enable(ds->ldoa17_reg);
+        }
+
+        if (IS_ERR_OR_NULL(ds->ldoa22_reg))
+            ds->ldoa22_reg = devm_regulator_get_optional(ds->pdev, "ldoa22");
+
+        if (IS_ERR(ds->ldoa22_reg) && PTR_ERR(ds->ldoa22_reg) == -EPROBE_DEFER) {
+            /* regulators may not be ready, so retry again later */
+            ds->ldoa22_reg = 0;
+        } else {
+            err = regulator_set_voltage(ds->ldoa22_reg, 2800000, 2800000);
+            err = regulator_enable(ds->ldoa22_reg);
+        }
+
+        if (IS_ERR_OR_NULL(ds->ldoa23_reg))
+            ds->ldoa23_reg = devm_regulator_get_optional(ds->pdev, "ldoa23");
+
+        if (IS_ERR(ds->ldoa23_reg) && PTR_ERR(ds->ldoa22_reg) == -EPROBE_DEFER) {
+            /* regulators may not be ready, so retry again later */
+            ds->ldoa23_reg = 0;
+        } else {
+            err = regulator_set_voltage(ds->ldoa23_reg, 975000, 1225000);
+            err = regulator_enable(ds->ldoa23_reg);
+        }
+    } else {
+        if (!IS_ERR_OR_NULL(ds->ldoa2_reg)) {
+            err = regulator_disable(ds->ldoa2_reg);
+            devm_regulator_put(ds->ldoa2_reg);
+        }
+        ds->ldoa2_reg = 0;
+        if (!IS_ERR_OR_NULL(ds->ldoa6_reg)) {
+            err = regulator_disable(ds->ldoa6_reg);
+            devm_regulator_put(ds->ldoa6_reg);
+        }
+        ds->ldoa6_reg = 0;
+        if (!IS_ERR_OR_NULL(ds->ldoa17_reg)) {
+            err = regulator_disable(ds->ldoa17_reg);
+            devm_regulator_put(ds->ldoa17_reg);
+        }
+        ds->ldoa17_reg = 0;
+        if (!IS_ERR_OR_NULL(ds->ldoa22_reg)) {
+            err = regulator_disable(ds->ldoa22_reg);
+            devm_regulator_put(ds->ldoa22_reg);
+        }
+        ds->ldoa22_reg = 0;
+        if (!IS_ERR_OR_NULL(ds->ldoa23_reg)) {
+            err = regulator_disable(ds->ldoa23_reg);
+            devm_regulator_put(ds->ldoa23_reg);
+        }
+        ds->ldoa23_reg = 0;
+    }
+}
+
 static ssize_t dock_switch_cam_ldos_state_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
     struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
@@ -1285,90 +1373,8 @@ static ssize_t dock_switch_cam_ldos_state_store(struct device *dev, struct devic
     err = kstrtos32(buf, 10, &i);
 
     if (0 == err) {
-        if (i > 0) {
-            if (IS_ERR_OR_NULL(ds->ldoa2_reg)) 
-                ds->ldoa2_reg = devm_regulator_get_optional(ds->pdev, "ldoa2");
-
-            if (IS_ERR(ds->ldoa2_reg) && PTR_ERR(ds->ldoa2_reg) == -EPROBE_DEFER) {
-                /* regulators may not be ready, so retry again later */
-                ds->ldoa2_reg = 0;
-            } else {
-                err = regulator_set_voltage(ds->ldoa2_reg, 975000, 1175000);
-                err = regulator_enable(ds->ldoa2_reg);
-            }
-
-            if (IS_ERR_OR_NULL(ds->ldoa6_reg)) 
-                ds->ldoa6_reg = devm_regulator_get_optional(ds->pdev, "ldoa6");
-
-            if (IS_ERR(ds->ldoa6_reg) && PTR_ERR(ds->ldoa6_reg) == -EPROBE_DEFER) {
-                /* regulators may not be ready, so retry again later */
-                ds->ldoa6_reg = 0;
-            } else {
-                err = regulator_set_voltage(ds->ldoa6_reg, 1800000, 1800000);
-                err = regulator_enable(ds->ldoa6_reg);
-            }
-
-            if (IS_ERR_OR_NULL(ds->ldoa17_reg))
-                ds->ldoa17_reg = devm_regulator_get_optional(ds->pdev, "ldoa17");
-
-            if (IS_ERR(ds->ldoa17_reg) && PTR_ERR(ds->ldoa17_reg) == -EPROBE_DEFER) {
-                /* regulators may not be ready, so retry again later */
-                ds->ldoa17_reg = 0;
-            } else {
-                err = regulator_set_voltage(ds->ldoa17_reg, 3000000, 3300000);
-                err = regulator_enable(ds->ldoa17_reg);
-            }
-
-            if (IS_ERR_OR_NULL(ds->ldoa22_reg))
-                ds->ldoa22_reg = devm_regulator_get_optional(ds->pdev, "ldoa22");
-
-            if (IS_ERR(ds->ldoa22_reg) && PTR_ERR(ds->ldoa22_reg) == -EPROBE_DEFER) {
-                /* regulators may not be ready, so retry again later */
-                ds->ldoa22_reg = 0;
-            } else {
-                err = regulator_set_voltage(ds->ldoa22_reg, 2800000, 2800000);
-                err = regulator_enable(ds->ldoa22_reg);
-            }
-
-            if (IS_ERR_OR_NULL(ds->ldoa23_reg))
-                ds->ldoa23_reg = devm_regulator_get_optional(ds->pdev, "ldoa23");
-
-            if (IS_ERR(ds->ldoa23_reg) && PTR_ERR(ds->ldoa22_reg) == -EPROBE_DEFER) {
-                /* regulators may not be ready, so retry again later */
-                ds->ldoa23_reg = 0;
-            } else {
-                err = regulator_set_voltage(ds->ldoa23_reg, 975000, 1225000);
-                err = regulator_enable(ds->ldoa23_reg);
-            }
-        } else {
-            if (!IS_ERR_OR_NULL(ds->ldoa2_reg)) {
-                err = regulator_disable(ds->ldoa2_reg);
-                devm_regulator_put(ds->ldoa2_reg);
-            }
-            ds->ldoa2_reg = 0;
-            if (!IS_ERR_OR_NULL(ds->ldoa6_reg)) {
-                err = regulator_disable(ds->ldoa6_reg);
-                devm_regulator_put(ds->ldoa6_reg);
-            }
-            ds->ldoa6_reg = 0;
-            if (!IS_ERR_OR_NULL(ds->ldoa17_reg)) {
-                err = regulator_disable(ds->ldoa17_reg);
-                devm_regulator_put(ds->ldoa17_reg);
-            }
-            ds->ldoa17_reg = 0;
-            if (!IS_ERR_OR_NULL(ds->ldoa22_reg)) {
-                err = regulator_disable(ds->ldoa22_reg);
-                devm_regulator_put(ds->ldoa22_reg);
-            }
-            ds->ldoa22_reg = 0;
-            if (!IS_ERR_OR_NULL(ds->ldoa23_reg)) {
-                err = regulator_disable(ds->ldoa23_reg);
-                devm_regulator_put(ds->ldoa23_reg);
-            }
-            ds->ldoa23_reg = 0;
-        }
+        en_all_cam_ldos(ds, i);
     }
-
 
     return count; 
 }
@@ -1849,6 +1855,7 @@ static int dock_switch_probe(struct platform_device *pdev)
         ds->attr_cam_ldos_state.attr.store = dock_switch_cam_ldos_state_store;
         sysfs_attr_init(&ds->attr_cam_ldos_state.attr.attr);
         device_create_file((&ds->sdev)->dev, &ds->attr_cam_ldos_state.attr);
+        //en_all_cam_ldos(ds, 1);
 
         /////////////////////////////////////////////////////////////////////////////////////////////
 

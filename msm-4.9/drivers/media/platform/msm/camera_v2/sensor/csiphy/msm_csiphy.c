@@ -63,7 +63,7 @@
 #define SNPS_MAX_DATA_RATE_PER_LANE               2500000000ULL
 
 #undef CDBG
-#define CDBG(fmt, args...) pr_debug(fmt, ##args)
+#define CDBG(fmt, args...) pr_notice(fmt, ##args)
 
 static struct v4l2_file_operations msm_csiphy_v4l2_subdev_fops;
 

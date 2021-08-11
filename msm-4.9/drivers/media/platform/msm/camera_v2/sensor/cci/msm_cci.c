@@ -42,7 +42,7 @@
 
 #undef CCI_DBG
 #ifdef MSM_CCI_DEBUG
-#define CCI_DBG(fmt, args...) pr_err(fmt, ##args)
+#define CCI_DBG(fmt, args...) pr_notice(fmt, ##args)
 #else
 #define CCI_DBG(fmt, args...) pr_debug(fmt, ##args)
 #endif

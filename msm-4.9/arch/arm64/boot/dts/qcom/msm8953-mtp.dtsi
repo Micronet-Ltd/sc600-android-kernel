@@ -32,9 +32,10 @@
 	};
 };
 
-//rid-> add i2c3 for tp0
+/*rid-> add i2c3 for tp0*/
 &i2c_3 {  /* BLSP1 QUP3 */
     status = "ok";
+/*
     goodix@5d {
         compatible = "goodix,gt9xx";
         reg = <0x5d>;
@@ -116,9 +117,10 @@
 		focaltech,key-y-coords = <1340 1340 1340>;
 		focaltech,key-x-coords = <150 330 660>;
 	};
+*/
 };
 
-//raynor-> add second tp
+/*raynor-> add second tp*/
 &i2c_2 {
 /*
     goodix@5d {

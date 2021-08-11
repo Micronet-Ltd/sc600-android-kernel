@@ -32,9 +32,9 @@
 };
 
 &pm8953_l2 {
-	regulator-min-microvolt = <975000>;
+	regulator-min-microvolt = <1175000>;
 	regulator-max-microvolt = <1175000>;
-	qcom,init-voltage = <975000>;
+	qcom,init-voltage = <1175000>;
 };
 
 &pm8953_l10 {

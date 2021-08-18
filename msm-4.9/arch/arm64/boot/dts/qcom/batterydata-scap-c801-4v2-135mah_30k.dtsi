@@ -17,7 +17,7 @@ qcom,c801_scap_4v2_135mah_30k {
 	qcom,fastchg-current-ma = <130>;
 	qcom,batt-id-kohm = <23>;
 	qcom,battery-beta = <3435>;
-	qcom,battery-therm-kohm = <47>;
+	qcom,battery-therm-kohm = <10>;
 	qcom,battery-type = "c801_scap_4v2_135mah_30k";
 	qcom,qg-batt-profile-ver = <100>;
 
@@ -31,14 +31,10 @@ qcom,c801_scap_4v2_135mah_30k {
 				4191000  4195000  70000
 				4196000  4200000  50000>;
 
-	/* COOL = 5 DegC, WARM = 40 DegC */
-	qcom,jeita-soft-thresholds = <0x5b70 0x3252>;
 	/* COOL = 0 DegC, WARM = 45 DegC */
-	/*qcom,jeita-soft-thresholds = <0x3730 0x0FB0>;*/
-	/* COLD = 0 DegC, HOT = 45 DegC */
-	qcom,jeita-hard-thresholds = <0x5fc9 0x2c99>;
+	qcom,jeita-soft-thresholds = <0x3730 0x0FB0>;
 	/* COLD = -10 DegC, HOT = 50 DegC */
-	/*qcom,jeita-hard-thresholds = <0x448E 0x0D8F>;*/
+	qcom,jeita-hard-thresholds = <0x448E 0x0D8F>;
 
 	qcom,fcc1-temp-lut {
 		qcom,lut-col-legend = <0 10 25 40 50>;

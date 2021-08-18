@@ -91,23 +91,36 @@
 	status = "ok";
 };
 
-/*
 &soc {
 	gpio-leds {
-        compatible = "gpio-leds";
-        status = "ok";
-        / * pinctrl-names = "default";
-        pinctrl-0 = <&gpio_led_off>; * /
-        red {
-            gpios = <&tlmm 36 0>;
-            label = "red";
-            linux,default-trigger = "none";
-            default-state = "off";
-            retain-state-suspended;
-        };
-    };
+		compatible = "gpio-leds";
+		status = "okay";
+        /* pinctrl-names = "default";
+        pinctrl-0 = <&gpio_led_off>; must be defined in pinctl*/
+
+		blue {
+			gpios = <&tlmm 22 0x0>;
+			label = "blue";
+			linux,default-trigger = "none";
+			default-state = "off";
+			retain-state-suspended;
+		};
+		green {
+			gpios = <&tlmm 20 0x0>;
+			label = "green";
+			linux,default-trigger = "none";
+			default-state = "off";
+			retain-state-suspended;
+		};
+		red {
+			gpios = <&tlmm 23 0x0>;
+			label = "red";
+			linux,default-trigger = "none";
+			default-state = "off";
+			retain-state-suspended;
+		};
+	};
 };
-*/
 
 &thermal_zones {
 	pmi-vbat-lvl0 {

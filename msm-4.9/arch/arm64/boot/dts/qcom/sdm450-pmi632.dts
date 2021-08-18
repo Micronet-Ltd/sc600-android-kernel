@@ -105,7 +105,8 @@
 		mcn,pwr-loss-mon = <&tlmm 98 GPIO_ACTIVE_LOW>;
 		mcn,wan-off-delay = <0>;
 		mcn,wlan-off-delay = <0>;
-		mcn,plat-off-delay = <180000>;
+		/*mcn,plat-off-delay = <180000>;*/
+		mcn,plat-off-delay = <0xFFFFFFFF>;
 		interrupt-names = "pwr-loss";
 		interrupt-parent = <&tlmm>;
 		interrupts = <&tlmm 98 0>;

@@ -2168,6 +2168,34 @@
 				};
 			};
 		};
+
+		gpio_led {
+			gpio_led_default: gpio_led_default {
+				mux {
+					pins = "gpio20", "gpio22", "gpio23";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio20", "gpio22", "gpio23";
+					drive-strength = <2>;
+					bias-pull-down;
+				};
+			};
+
+			gpio_led_suspend: gpio_led_suspend {
+				mux {
+					pins = "gpio20", "gpio22", "gpio23";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio20", "gpio22", "gpio23";
+					drive-strength = <2>;
+					bias-pull-down;
+				};
+			};
+		};
 /* cradle connectivety */
 		watchdog_pin {
 			watchdog_pin_active: watchdog_pin_active {

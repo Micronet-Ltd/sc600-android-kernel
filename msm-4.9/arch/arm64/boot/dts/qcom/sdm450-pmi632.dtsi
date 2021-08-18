@@ -95,8 +95,8 @@
 	gpio-leds {
 		compatible = "gpio-leds";
 		status = "okay";
-        /* pinctrl-names = "default";
-        pinctrl-0 = <&gpio_led_off>; must be defined in pinctl*/
+		pinctrl-names = "default";
+		pinctrl-0 = <&gpio_led_default>;
 
 		blue {
 			gpios = <&tlmm 22 0x0>;

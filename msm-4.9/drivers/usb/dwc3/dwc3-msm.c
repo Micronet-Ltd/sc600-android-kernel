@@ -4355,11 +4355,11 @@ static int dwc3_msm_gadget_vbus_draw(struct dwc3_msm *mdwc, unsigned int mA)
 	if (mdwc->max_power == mA || psy_type != POWER_SUPPLY_TYPE_USB)
 		return 0;
 
-	dev_notice(mdwc->dev, "draw from USB = %u\n", mA);
 	/* Set max current limit in uA */
     if (mdwc->vbus_active && mA < 100) {
         mA = 900;
     }
+    dev_notice(mdwc->dev, "draw from USB = %u\n", mA);
     pval.intval = 1000 * mA; 
 
 set_prop:

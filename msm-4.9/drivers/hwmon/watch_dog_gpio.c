@@ -102,7 +102,7 @@ static ssize_t rfkillpin_store(struct device *dev, struct device_attribute *attr
 
     if(gpio_is_valid(wdi->rf_kill_pin)){
         spin_lock_irqsave(&wdi->rfkillpin_lock, wdi->lock_flags);
-        gpio_set_value(wdi->rf_kill_pin, val);
+        gpio_direction_output(wdi->rf_kill_pin, val);
         wdi->rf_state = val;
         spin_unlock_irqrestore(&wdi->rfkillpin_lock, wdi->lock_flags);
         return count;
@@ -166,7 +166,7 @@ static ssize_t rfkillpin_write(struct file *file, const char __user *buf, size_t
         val = ('0' == *buf)?0:1;
 
 		if(gpio_is_valid(wdi->rf_kill_pin)){
-			gpio_set_value(wdi->rf_kill_pin, val);
+			gpio_direction_output(wdi->rf_kill_pin, val);
             wdi->rf_state = val;
             return count;
 		}
@@ -238,13 +238,13 @@ static void watchdog_toggle_work(struct work_struct *work)
         } else {
             d = 1; //!inf->portable;
         }
-        gpio_set_value(inf->toggle_pin, (int)d);
+        gpio_direction_output(inf->toggle_pin, (int)d);
         return;
     }
 
     inf->state ^= 1; 
     d = (inf->state)?inf->high_delay:inf->low_delay;
-    gpio_set_value(inf->toggle_pin, inf->state);
+    gpio_direction_output(inf->toggle_pin, inf->state);
 
     schedule_delayed_work(&inf->toggle_work,msecs_to_jiffies(d));
 }
@@ -483,7 +483,7 @@ static int watchdog_pin_prepare(struct device *dev)
 
     if(gpio_is_valid(wdi->rf_kill_pin)){
         pr_notice("shut down rf %lld\n", ktime_to_ms(ktime_get()));
-        gpio_set_value(wdi->rf_kill_pin, wdi->rf_state^1);
+        gpio_direction_output(wdi->rf_kill_pin, wdi->rf_state^1);
     }
 
     if (gpio_is_valid(wdi->toggle_pin)) {
@@ -492,12 +492,12 @@ static int watchdog_pin_prepare(struct device *dev)
         if (wdi->high_delay == wdi->low_delay) {
             //d = 1;
         }
-        gpio_set_value(wdi->toggle_pin, d);
+        gpio_direction_output(wdi->toggle_pin, d);
     }
 
 	if(gpio_is_valid(wdi->suspend_ind)){
         pr_notice("notify to mcu[obc5] about suspend %lld\n", ktime_to_ms(ktime_get()));
-        gpio_set_value(wdi->suspend_ind, wdi->suspend_ind_a);
+        gpio_direction_output(wdi->suspend_ind, wdi->suspend_ind_a);
     }
 
     pr_notice("prepared %lld\n", ktime_to_ms(ktime_get()));
@@ -534,12 +534,12 @@ static int watchdog_pin_resume(struct device *dev)
 
 	if(gpio_is_valid(wdi->suspend_ind)){
 		pr_notice("notify to mcu about resume %lld\n", ktime_to_ms(ktime_get()));
-		gpio_set_value(wdi->suspend_ind, wdi->suspend_ind_a^1);
+		gpio_direction_output(wdi->suspend_ind, wdi->suspend_ind_a^1);
 	}
 
     if(gpio_is_valid(wdi->rf_kill_pin)){
 		pr_notice("restore rf-kill [%d] %lld\n", wdi->rf_state, ktime_to_ms(ktime_get()));
-        gpio_set_value(wdi->rf_kill_pin, wdi->rf_state);
+        gpio_direction_output(wdi->rf_kill_pin, wdi->rf_state);
     }
 
 	return 0;
@@ -572,12 +572,12 @@ static void watchdog_pin_shutdown(struct platform_device *dev)
 
     if(gpio_is_valid(wdi->rf_kill_pin)){
         pr_notice("shutdown rf-kill [%d] %lld\n", wdi->rf_state, ktime_to_ms(ktime_get()));
-        gpio_set_value(wdi->rf_kill_pin, wdi->rf_state^1);
+        gpio_direction_output(wdi->rf_kill_pin, wdi->rf_state^1);
     }
 
     if (gpio_is_valid(wdi->toggle_pin)) {
         pr_notice("set toggle pin to inactive [%d] %lld\n", wdi->state, ktime_to_ms(ktime_get()));
-        gpio_set_value(wdi->toggle_pin, 0);
+        gpio_direction_output(wdi->toggle_pin, 0);
     }
 
     return;

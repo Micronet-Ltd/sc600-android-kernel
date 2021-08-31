@@ -56,6 +56,9 @@ module_param_named(
 	esr_count, qg_esr_count, int, 0600
 );
 
+#define EMPTY_SOC		0
+#define FULL_SOC		100
+
 static bool is_battery_present(struct qpnp_qg *chip)
 {
 	u8 reg = 0;
@@ -236,6 +239,8 @@ static void qg_notify_charger(struct qpnp_qg *chip)
 
 	if (0 == strncmp(chip->bp.batt_type_str, "c801_scap_4v2_135mah_30k", strlen("c801_scap_4v2_135mah_30k"))) {
 		union power_supply_propval prop = {0,};
+		chip->msoc = chip->maint_soc = FULL_SOC;
+		chip->charge_full = 1;
 		prop.intval = 1;
 		pr_notice("s-cap profile, disable charging\n");
 		power_supply_set_property(chip->batt_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
@@ -1522,8 +1527,6 @@ static const char *qg_get_battery_type(struct qpnp_qg *chip)
 
 #define DEBUG_BATT_SOC		67
 #define BATT_MISSING_SOC	50
-#define EMPTY_SOC		0
-#define FULL_SOC		100
 static int qg_get_battery_capacity(struct qpnp_qg *chip, int *soc)
 {
 	if (is_debug_batt_id(chip)) {

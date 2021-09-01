@@ -41,7 +41,7 @@
 #include "qg-defs.h"
 
 //static int qg_debug_mask = 	QG_DEBUG_PON | QG_DEBUG_PROFILE | QG_DEBUG_STATUS | QG_DEBUG_IRQ | QG_DEBUG_SOC | QG_DEBUG_PM;
-static int qg_debug_mask = 	QG_DEBUG_PON | QG_DEBUG_PROFILE | QG_DEBUG_IRQ | QG_DEBUG_PM;
+static int qg_debug_mask = 	QG_DEBUG_PON | QG_DEBUG_PROFILE | QG_DEBUG_PM;
 module_param_named(
 	debug_mask, qg_debug_mask, int, 0600
 );
@@ -1682,6 +1682,7 @@ static int qg_psy_set_property(struct power_supply *psy,
 		if (!rc)
 			chip->cl->learned_cap_uah = pval->intval;
 		mutex_unlock(&chip->cl->lock);
+        pr_notice("battery full\n");
 		break;
 	case POWER_SUPPLY_PROP_SOH:
 		chip->soh = pval->intval;
@@ -1907,6 +1908,7 @@ static int qg_charge_full_update(struct qpnp_qg *chip)
 				chip->charge_done);
 	if (chip->charge_done && !chip->charge_full) {
 		if (chip->msoc >= 99 && health == POWER_SUPPLY_HEALTH_GOOD) {
+            pr_notice("battery full\n");
 			chip->charge_full = true;
 			qg_dbg(chip, QG_DEBUG_STATUS, "Setting charge_full (0->1) @ msoc=%d\n",
 					chip->msoc);
@@ -1928,6 +1930,7 @@ static int qg_charge_full_update(struct qpnp_qg *chip)
 			usb_present && chip->msoc <= recharge_soc &&
 			chip->charge_status != POWER_SUPPLY_STATUS_CHARGING) {
 			/* Force recharge */
+            pr_notice("resume charging\n");
 			prop.intval = 0;
 			rc = power_supply_set_property(chip->batt_psy,
 				POWER_SUPPLY_PROP_RECHARGE_SOC, &prop);
@@ -1952,6 +1955,7 @@ static int qg_charge_full_update(struct qpnp_qg *chip)
 				chip->maint_soc = FULL_SOC;
 				qg_scale_soc(chip, false);
 			}
+            pr_notice("battery reached recharge threshold\n");
 			chip->charge_full = false;
 			qg_dbg(chip, QG_DEBUG_STATUS, "msoc=%d recharge_soc=%d charge_full (1->0)\n",
 					chip->msoc, recharge_soc);
@@ -3863,6 +3867,12 @@ static int qpnp_qg_probe(struct platform_device *pdev)
 		pr_err("Failed to initialize QG psy, rc=%d\n", rc);
 		goto fail_votable;
 	}
+    if (0 == strncmp(chip->bp.batt_type_str, "c801_scap_4v2_135mah_30k", strlen("c801_scap_4v2_135mah_30k"))) {
+        union power_supply_propval prop = {0,};
+        prop.intval = 1;
+        pr_notice("s-cap profile, disable charging\n");
+        power_supply_set_property(chip->batt_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
+    }
 
 	rc = qg_request_irqs(chip);
 	if (rc < 0) {

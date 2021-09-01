@@ -357,6 +357,7 @@ struct device_node *of_batterydata_get_best_profile(
 			if (rc)
 				continue;
 			for (i = 0; i < batt_ids.num; i++) {
+                pr_notice("%s:%d.[%d] check match profile batt_id %d kohm to measured batt_id %d kohm\n", __func__, __LINE__, i, batt_ids.kohm[i], batt_id_kohm);
 				delta = abs(batt_ids.kohm[i] - batt_id_kohm);
 				limit = (batt_ids.kohm[i] * id_range_pct) / 100;
 				in_range = (delta <= limit);

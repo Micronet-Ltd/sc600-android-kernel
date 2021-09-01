@@ -25,6 +25,16 @@
 };
 
 &soc {
+	virtual_leds {
+		compatible = "virtual-leds-fixed";
+		status = "okay";
+	};
+
+	virtual_j1708 {
+		compatible = "virtual-j1708";
+		status = "okay";
+	};
+
 	watchdogpin {
 		compatible = "mcn,fixed-watchdog-pin";
 		pinctrl-names = "watchdog_pin_active", "watchdog_pin_suspend";
@@ -36,6 +46,7 @@
 		mcn,low-delay=<1000>;
 		status = "okay";
 	};
+
 	dock {
 		compatible = "mcn,fixed-dock-switch";
 		pinctrl-names = "dock_pins_active", "dock_pin_suspend";
@@ -51,6 +62,7 @@
 		interrupts = <&tlmm 36 0>;
 		status = "okay";
 	};
+
 	hi3w {
 		compatible = "mcn,hi-3w";
 		pinctrl-names = "hi_3w_pins_active", "hi_3w_pin_suspend";
@@ -60,6 +72,49 @@
 		mcn,3w-miso-pin = <&tlmm 90 GPIO_ACTIVE_LOW>;
 		mcn,3w-mosi-pin = <&tlmm 22 GPIO_ACTIVE_LOW>;
 		status = "okay";
+	};
+
+	dev_info {
+		compatible = "mcn,device-info";
+		pinctrl-names = "dev_info_active", "dev_info_suspend";
+		pinctrl-0 = <&dev_info_active>;
+		pinctrl-1 = <&dev_info_suspend>;
+		/* wait for board prototype */
+		/* mcn,board-id-0 = <&tlmm 94 GPIO_ACTIVE_LOW>;
+		mcn,board-id-1 = <&tlmm 95 GPIO_ACTIVE_LOW>;
+		mcn,board-id-2 = <&tlmm 96 GPIO_ACTIVE_LOW>; */
+		status = "okay";
+	};
+
+	pwr_loss_mon {
+		compatible = "mcn,pwr-loss-mon";
+		pinctrl-names = "pwr_loss_mon_active", "pwr_loss_mon_suspend";
+		pinctrl-0 = <&pwr_loss_mon_active>;
+		pinctrl-1 = <&pwr_loss_mon_suspend>;
+		mcn,pwr-loss-mon = <&tlmm 98 GPIO_ACTIVE_LOW>;
+		mcn,wan-off-delay = <0>;
+		mcn,wlan-off-delay = <0>;
+		mcn,plat-off-delay = <180000>;
+		interrupt-names = "pwr-loss";
+		interrupt-parent = <&tlmm>;
+		interrupts = <&tlmm 98 0>;
+		status = "okay";
+	};
+
+	fixed-vinputs {
+		compatible = "mcn,fixed-vinputs";
+		status = "okay";
+	};
+
+	gpio_keys {
+		user_btn {
+			label = "F24";
+			/* wait for board prototype */
+			/*gpios = <&tlmm 25 0x1>;*/
+			linux,input-type = <1>;
+			linux,code = <194>;
+			debounce-interval = <15>;
+		};
 	};
 };
 

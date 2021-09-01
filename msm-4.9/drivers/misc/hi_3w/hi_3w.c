@@ -11,7 +11,6 @@
 //#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
-// BYU   #include <linux/switch.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
@@ -20,7 +19,6 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/workqueue.h>
-// BYU  #include <linux/wakelock.h>
 #include <linux/pm_wakeup.h>
 
 #include <linux/notifier.h>
@@ -170,7 +168,7 @@ int hi_3w_tx_cmd(uint32_t *cmd, bool wait_for_response)
         err = NO_ERROR;
     } else {
         time_tresh = ktime_to_us(ktime_get()) - time_tresh;
-        pr_notice("request NACKed on cmd %d [%d, %d]\n", *cmd, response, time_tresh);
+        pr_notice("request NACKed on cmd %x [%x, %d]\n", *cmd, response, time_tresh);
         //NACK is received
 
         err = CMD_REJECTED;
@@ -213,6 +211,9 @@ static ssize_t hi_3w_tx_store(struct device *dev, struct device_attribute *attr,
         if (!err) {
             err = count; 
         }
+        if (w) {
+            pr_notice("%x", ((cmd >> 16) & 0xFF) | ((cmd >> 8) & 0xFF) | (cmd & 0xFF));
+        }
     }
 
     return err; 
@@ -225,8 +226,6 @@ static int hi_3w_probe(struct platform_device *pdev)
     struct device *dev = &pdev->dev;
     struct device_node *np;
     struct pinctrl_state *pctls;
-
-printk("byu003 %s: %d  \n", __func__, __LINE__);
 
     np = dev->of_node;
     if (!np) {
@@ -271,9 +270,6 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
 
         mutex_init(&hi_dev->lock);
 
-//BYU        INIT_WORK(&hi_dev->work, dock_switch_work_func);
-
-//        wake_lock_init(&hi_dev->wlock, WAKE_LOCK_SUSPEND, "hi_3w_wait_lock");
         wakeup_source_init(&hi_dev->wlock, "hi_3w_wait_lock");
 
         //Init 3wire clock pin
@@ -367,7 +363,6 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
         hi_dev->attr_cmd2slv.attr.store = hi_3w_tx_store;
         sysfs_attr_init(&hi_dev->attr_cmd2slv.attr.attr);
         device_create_file(dev, &hi_dev->attr_cmd2slv.attr);
-printk("byu003 %s: %d  \n", __func__, __LINE__);
 
         return NO_ERROR;
 
@@ -381,7 +376,6 @@ printk("byu003 %s: %d  \n", __func__, __LINE__);
         devm_gpio_free(&pdev->dev, hi_dev->hi_3w_miso_pin);
     devm_kfree(dev, hi_dev);
  
-printk("byu003 %s: %d  \n", __func__, __LINE__);     
     pr_err("Error initializing\n");
 
     return err;
@@ -402,7 +396,7 @@ static int hi_3w_remove(struct platform_device *pdev)
 
     wakeup_source_trash(&hi_dev->wlock);
 
-     dev_set_drvdata(&pdev->dev, 0);
+    dev_set_drvdata(&pdev->dev, 0);
 
     devm_kfree(&pdev->dev, hi_dev);
 

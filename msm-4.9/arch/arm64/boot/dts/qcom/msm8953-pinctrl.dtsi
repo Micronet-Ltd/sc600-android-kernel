@@ -77,7 +77,7 @@
                 };
             };
 			
-			uart5_active: uart5_active {
+	    uart5_active: uart5_active {
                 mux {
                         pins = "gpio16", "gpio17";
                         function = "blsp_uart5";
@@ -2201,10 +2201,10 @@
 				};
 			};
 		};
-/*
+
 		dev_info {
 			dev_info_active: dev_info_active {
-				mux {
+				/*mux {
 					pins = "gpio94", "gpio95", "gpio96";
 					function = "gpio";
 				};
@@ -2213,11 +2213,11 @@
 					pins = "gpio94", "gpio95", "gpio96";
 					drive-strength = <2>;
 					bias-disable;
-				};
+				};*/
 			};
 
 			dev_info_suspend: dev_info_suspend {
-				mux {
+				/*mux {
 					pins = "gpio94", "gpio95", "gpio96";
 					function = "gpio";
 				};
@@ -2226,7 +2226,7 @@
 					pins = "gpio94", "gpio95", "gpio96";
 					drive-strength = <2>;
 					bias-disable;
-				};
+				};*/
 			};
 		};
 		pwr_loss_mon {
@@ -2256,6 +2256,5 @@
 				};
 			};
 		};
-*/
 	};
 };

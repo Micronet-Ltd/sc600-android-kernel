@@ -3007,6 +3007,44 @@ static void check_for_sdp_connection(struct work_struct *w)
 	}
 }
 
+static RAW_NOTIFIER_HEAD(power_ok_notify_chain);
+static DEFINE_RAW_SPINLOCK(power_ok_notify_chain_lock);
+
+void power_ok_notify(unsigned long reason, void *arg)
+{
+    unsigned long flags;
+
+    raw_spin_lock_irqsave(&power_ok_notify_chain_lock, flags);
+    raw_notifier_call_chain(&power_ok_notify_chain, reason, 0);
+    raw_spin_unlock_irqrestore(&power_ok_notify_chain_lock, flags);
+}
+
+int power_ok_register_notifier(struct notifier_block *nb)
+{
+    unsigned long flags;
+    int err;
+
+    raw_spin_lock_irqsave(&power_ok_notify_chain_lock, flags);
+    err = raw_notifier_chain_register(&power_ok_notify_chain, nb);
+    raw_spin_unlock_irqrestore(&power_ok_notify_chain_lock, flags);
+
+    return err;
+}
+EXPORT_SYMBOL(power_ok_register_notifier);
+
+int power_ok_unregister_notifier(struct notifier_block *nb)
+{
+    unsigned long flags;
+    int err;
+
+    raw_spin_lock_irqsave(&power_ok_notify_chain_lock, flags);
+    err = raw_notifier_chain_unregister(&power_ok_notify_chain, nb);
+    raw_spin_unlock_irqrestore(&power_ok_notify_chain_lock, flags);
+
+    return err;
+}
+EXPORT_SYMBOL(power_ok_unregister_notifier);
+
 static int dwc3_msm_vbus_notifier(struct notifier_block *nb,
 	unsigned long event, void *ptr)
 {
@@ -3019,6 +3057,7 @@ static int dwc3_msm_vbus_notifier(struct notifier_block *nb,
 		return NOTIFY_DONE;
 
 	mdwc->vbus_active = event;
+    power_ok_notify(mdwc->vbus_active, 0);
 	if (dwc->is_drd && !mdwc->in_restart)
 		queue_work(mdwc->dwc3_wq, &mdwc->resume_work);
 

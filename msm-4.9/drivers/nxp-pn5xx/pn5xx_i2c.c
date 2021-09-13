@@ -366,7 +366,7 @@ static long  pn54x_dev_ioctl(struct file *filp, unsigned int cmd,
 				unsigned long arg)
 {
 	struct pn54x_dev *pn54x_dev = filp->private_data;
-
+	pr_err("hk %s, cmd=0x%08x, PN544_SET_PWR=0x%08x\n", __func__, cmd, (unsigned int)PN544_SET_PWR);
 	pr_err("hk %s, cmd=%d, arg=%lu\n", __func__, cmd, arg);
 	switch (cmd) {
 	case PN544_SET_PWR:
@@ -420,7 +420,7 @@ static long  pn54x_dev_ioctl(struct file *filp, unsigned int cmd,
 		pr_err("%s bad ioctl %u\n", __func__, cmd);
 		return -EINVAL;
 	}
-
+	pr_err("%s: SUCCESS return 0\n", __func__);
 	return 0;
 }
 

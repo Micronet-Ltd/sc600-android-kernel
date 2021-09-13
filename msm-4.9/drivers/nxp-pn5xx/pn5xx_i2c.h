@@ -35,8 +35,8 @@
 
 #define GPIO_UNUSED -1
 
-#define PN544_SET_PWR	_IOW(PN544_MAGIC, 0x01, long)
-#define PN54X_CLK_REQ	_IOW(PN544_MAGIC, 0x02, long)
+#define PN544_SET_PWR	_IOW(PN544_MAGIC, 0x01, unsigned int)
+#define PN54X_CLK_REQ	_IOW(PN544_MAGIC, 0x02, unsigned int)
 
 struct pn544_i2c_platform_data {
 	unsigned int power_gpio;

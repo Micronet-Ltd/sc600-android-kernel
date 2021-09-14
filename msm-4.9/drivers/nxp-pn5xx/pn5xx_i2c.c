@@ -255,6 +255,7 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
 		}
 
 		while (1) {
+pr_err("%s while(1) pn54x\n", __func__);
 			pn54x_dev->irq_enabled = true;
 			enable_irq(pn54x_dev->client->irq);
 			ret = wait_event_interruptible(
@@ -262,14 +263,17 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
 					!pn54x_dev->irq_enabled);
 
 			pn54x_disable_irq(pn54x_dev);
-
+pr_err("%s  pn54x event_interruptible\n", __func__);
 			if (ret)
-				goto fail;
-
+            {
+pr_err("%s  pn54x  goto fail\n", __func__);
+                goto fail;
+            }
+				
 			if (gpio_get_value(pn54x_dev->irq_gpio))
 				break;
 
-			pr_warning("%s: spurious interrupt detected\n", __func__);
+			pr_err("%s: spurious interrupt detected\n", __func__);
 		}
 	}
 
@@ -283,18 +287,19 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
 	udelay(1000);
 
 	if (ret < 0) {
-		pr_err("%s: i2c_master_recv returned %d\n", __func__, ret);
+		pr_err("%s: pn54x i2c_master_recv returned %d\n", __func__, ret);
 		return ret;
 	}
 	if (ret > count) {
-		pr_err("%s: received too many bytes from i2c (%d)\n",
+		pr_err("%s: pn54x received too many bytes from i2c (%d)\n",
 			__func__, ret);
 		return -EIO;
 	}
 	if (copy_to_user(buf, tmp, ret)) {
-		pr_warning("%s : failed to copy to user space\n", __func__);
+		pr_err("%s : pn54x failed to copy to user space\n", __func__);
 		return -EFAULT;
 	}
+pr_err("%s : pn54x copy to user space OK %d bytes \n", __func__,ret);
 	return ret;
 
 fail:

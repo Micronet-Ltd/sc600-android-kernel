@@ -81,7 +81,7 @@
 		pinctrl-0 = <&hi_3w_pins_active>;
 		pinctrl-1 = <&hi_3w_pin_suspend>;
 		mcn,3w-clock-pin = <&tlmm 13 GPIO_ACTIVE_LOW>;
-		mcn,3w-miso-pin = <&tlmm 132 GPIO_ACTIVE_LOW>;
+		mcn,3w-miso-pin = <&tlmm 89 GPIO_ACTIVE_LOW>;
 		mcn,3w-mosi-pin = <&tlmm 2 GPIO_ACTIVE_LOW>;
 		status = "okay";
 	};

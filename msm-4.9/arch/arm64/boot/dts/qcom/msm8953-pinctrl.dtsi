@@ -2254,12 +2254,12 @@
 		hi_3w {
 			hi_3w_pins_active: hi_3w_pins_active {
 				mux {
-					pins = "gpio132", "gpio13", "gpio2";
+					pins = "gpio89", "gpio13", "gpio2";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio132", "gpio13", "gpio2";
+					pins = "gpio89", "gpio13", "gpio2";
 					drive-strength = <6>;
 					bias-pull-up;
 				};
@@ -2267,12 +2267,12 @@
 
 			hi_3w_pin_suspend: hi_3w_pin_suspend {
 				mux {
-					pins = "gpio132", "gpio13", "gpio2";
+					pins = "gpio89", "gpio13", "gpio2";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio132", "gpio13", "gpio2";
+					pins = "gpio89", "gpio13", "gpio2";
 					drive-strength = <2>;
 					bias-pull-down;
 				};

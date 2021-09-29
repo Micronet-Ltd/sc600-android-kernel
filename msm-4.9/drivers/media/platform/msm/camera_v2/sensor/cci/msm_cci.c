@@ -41,14 +41,14 @@
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
 #undef CCI_DBG
-#define MSM_CCI_DEBUG 1
+//#define MSM_CCI_DEBUG 1
 #ifdef MSM_CCI_DEBUG
 #define CCI_DBG(fmt, args...) pr_notice(fmt, ##args)
 #else
 #define CCI_DBG(fmt, args...) pr_debug(fmt, ##args)
 #endif
 
-#define CCI_DUMP_REG 1
+#define CCI_DUMP_REG 0
 
 /* Max bytes that can be read per CCI read transaction */
 #define CCI_READ_MAX 12

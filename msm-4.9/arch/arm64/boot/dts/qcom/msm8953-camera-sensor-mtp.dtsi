@@ -24,6 +24,7 @@
 		qcom,cam-vreg-op-mode = <80000>;
 	};
 
+/*
 	actuator1: qcom,actuator@1 {
 		cell-index = <1>;
 		reg = <0x1>;
@@ -36,7 +37,6 @@
 		qcom,cam-vreg-op-mode = <80000>;
 	};
 
-/*
 	eeprom0: qcom,eeprom@0 {
 		cell-index = <0>;
 		compatible = "qcom,eeprom";
@@ -122,8 +122,8 @@
 		cam_vana-supply = <&pm8953_l22>;
 		cam_vio-supply = <&pm8953_l6>;
 		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vana";
-		qcom,cam-vreg-min-voltage = <1175000 0 2800000>;
-		qcom,cam-vreg-max-voltage = <1175000 0 2800000>;
+		qcom,cam-vreg-min-voltage = <1200000 0 2800000>;
+		qcom,cam-vreg-max-voltage = <1200000 0 2800000>;
 		qcom,cam-vreg-op-mode = <105000 0 80000>;
 		qcom,gpio-no-mux = <0>;
 		pinctrl-names = "cam_default", "cam_suspend";
@@ -244,7 +244,7 @@
 		qcom,csid-sd-index = <1>;
 		qcom,mount-angle = <270>;
 		qcom,eeprom-src = <&eeprom2>;
-		qcom,actuator-src = <&actuator1>;
+		/*qcom,actuator-src = <&actuator1>;*/
 		cam_vdig-supply = <&pm8953_l2>;
 		cam_vana-supply = <&pm8953_l22>;
 		cam_vio-supply = <&pm8953_l6>;
@@ -274,7 +274,7 @@
 					  "CAM_STANDBY2",
 					  "CAM_GPIO_VANA2";
 		qcom,sensor-position = <1>;
-		qcom,sensor-mode = <1>;
+		qcom,sensor-mode = <0>;
 		qcom,cci-master = <0>;
 		status = "ok";
 		clocks = <&clock_gcc clk_mclk1_clk_src>,

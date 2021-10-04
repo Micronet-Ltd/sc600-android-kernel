@@ -56,6 +56,15 @@
 #define CONFIG_OF
 #endif
 
+// #define DEBUG_NFC_RUN 1
+
+#ifdef DEBUG_NFC_RUN
+#define DEBUG_NFC(x...)   pr_err(x)
+#else
+#define DEBUG_NFC(x...)
+#endif
+
+
 struct pn54x_dev	{
 	wait_queue_head_t read_wq;
 	struct mutex read_mutex;
@@ -80,7 +89,7 @@ struct pn54x_dev	{
 static void pn54x_disable_irq(struct pn54x_dev *pn54x_dev)
 {
 	unsigned long flags;
-
+DEBUG_NFC("%s", __func__);
 	spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags);
 	if (pn54x_dev->irq_enabled) {
 		disable_irq_nosync(pn54x_dev->client->irq);
@@ -92,7 +101,7 @@ static void pn54x_disable_irq(struct pn54x_dev *pn54x_dev)
 static irqreturn_t pn54x_dev_irq_handler(int irq, void *dev_id)
 {
 	struct pn54x_dev *pn54x_dev = dev_id;
-
+DEBUG_NFC("%s", __func__);
 	pn54x_disable_irq(pn54x_dev);
 
 	/* Wake up waiting readers */
@@ -108,11 +117,12 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 {
 	int r;
 	int hk_ret;
-
+DEBUG_NFC("%s: %d", __func__, __LINE__);
 	/* turn on the regulators */
 	/* -- if the regulators were specified, they're required */
 	if(dev->pvdd_reg != NULL)
 	{
+DEBUG_NFC("%s: %d", __func__, __LINE__);
 		r = regulator_enable(dev->pvdd_reg);
 		if (r < 0){
 			pr_err("%s: not able to enable pvdd\n", __func__);
@@ -121,6 +131,7 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 	}
 	if(dev->vbat_reg != NULL)
 	{
+DEBUG_NFC("%s: %d", __func__, __LINE__);
 		r = regulator_enable(dev->vbat_reg);
 		if (r < 0){
 			pr_err("%s: not able to enable vbat\n", __func__);
@@ -129,6 +140,7 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 	}
 	if(dev->pmuvcc_reg != NULL)
 	{
+DEBUG_NFC("%s: %d", __func__, __LINE__);
 		r = regulator_enable(dev->pmuvcc_reg);
 		if (r < 0){
 			pr_err("%s: not able to enable pmuvcc\n", __func__);
@@ -137,6 +149,7 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 	}
 	if(dev->sevdd_reg != NULL)
 	{
+DEBUG_NFC("%s: %d", __func__, __LINE__);
 		r = regulator_enable(dev->sevdd_reg);
 		if (r < 0){
 			pr_err("%s: not able to enable sevdd\n", __func__);
@@ -155,8 +168,10 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 	if (MODE_RUN == mode) {
 		pr_err("%s power on\n", __func__);
 		if (gpio_is_valid(dev->firm_gpio))
+		{
 			gpio_set_value_cansleep(dev->firm_gpio, 0);
-		
+DEBUG_NFC("%s: %d dev->firm_gpio %d set 0", __func__, __LINE__,dev->firm_gpio);
+		}		
 		gpio_set_value_cansleep(dev->ven_gpio, 1);// hk
 		msleep(100);
 		hk_ret = gpio_get_value(dev->ven_gpio);
@@ -167,11 +182,13 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 		 */
 		pr_err("%s power on with firmware\n", __func__);
 		gpio_set_value(dev->ven_gpio, 1);
+DEBUG_NFC("%s: %d dev->ven_gpio %d set 1", __func__, __LINE__,dev->ven_gpio);
 		msleep(20);
 		hk_ret = gpio_get_value(dev->ven_gpio);
 		pr_err("hk 11 hk_ret = %d\n", hk_ret);
 		if (gpio_is_valid(dev->firm_gpio)) {
 			gpio_set_value(dev->firm_gpio, 1);
+DEBUG_NFC("%s: %d dev->ven_firm_gpio %d set 1", __func__, __LINE__,dev->firm_gpio);
 		}
 		else {
 			pr_err("%s Unused Firm GPIO %d\n", __func__, mode);
@@ -180,9 +197,12 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 		msleep(20);
 		gpio_set_value(dev->ven_gpio, 0);
 		hk_ret = gpio_get_value(dev->ven_gpio);
+DEBUG_NFC("%s: %d dev->ven_gpio %d set 0", __func__, __LINE__,dev->ven_gpio);
+
 		pr_err("hk 22 hk_ret = %d\n", hk_ret);
 		msleep(100);
 		gpio_set_value(dev->ven_gpio, 1);
+DEBUG_NFC("%s: %d dev->ven_gpio %d set 0", __func__, __LINE__,dev->ven_gpio);
 		msleep(20);
 		hk_ret = gpio_get_value(dev->ven_gpio);
 		pr_err("hk 33 hk_ret = %d\n", hk_ret);
@@ -213,6 +233,7 @@ static void pn544_disable(struct pn54x_dev *dev)
 	//int r = 0;
 	/* power off */
 	pr_err("hk %s power off\n", __func__);
+DEBUG_NFC("%s: %d ", __func__, __LINE__);
 	if (gpio_is_valid(dev->firm_gpio))
 		gpio_set_value_cansleep(dev->firm_gpio, 0);
 	
@@ -240,7 +261,7 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
 	struct pn54x_dev *pn54x_dev = filp->private_data;
 	char tmp[MAX_BUFFER_SIZE];
 	int ret;
-
+DEBUG_NFC("%s: %d ", __func__, __LINE__);
 	if (count > MAX_BUFFER_SIZE)
 		count = MAX_BUFFER_SIZE;
 
@@ -255,7 +276,7 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
 		}
 
 		while (1) {
-pr_err("%s while(1) pn54x\n", __func__);
+DEBUG_NFC("%s while(1) pn54x\n", __func__);
 			pn54x_dev->irq_enabled = true;
 			enable_irq(pn54x_dev->client->irq);
 			ret = wait_event_interruptible(
@@ -263,10 +284,10 @@ pr_err("%s while(1) pn54x\n", __func__);
 					!pn54x_dev->irq_enabled);
 
 			pn54x_disable_irq(pn54x_dev);
-pr_err("%s  pn54x event_interruptible\n", __func__);
+DEBUG_NFC("%s  pn54x event_interruptible\n", __func__);
 			if (ret)
             {
-pr_err("%s  pn54x  goto fail\n", __func__);
+DEBUG_NFC("%s  pn54x  goto fail\n", __func__);
                 goto fail;
             }
 				
@@ -299,7 +320,7 @@ pr_err("%s  pn54x  goto fail\n", __func__);
 		pr_err("%s : pn54x failed to copy to user space\n", __func__);
 		return -EFAULT;
 	}
-pr_err("%s : pn54x copy to user space OK %d bytes \n", __func__,ret);
+DEBUG_NFC("%s : pn54x copy to user space OK %d bytes \n", __func__,ret);
 	return ret;
 
 fail:
@@ -313,7 +334,7 @@ static ssize_t pn54x_dev_write(struct file *filp, const char __user *buf,
 	struct pn54x_dev  *pn54x_dev;
 	char tmp[MAX_BUFFER_SIZE];
 	int ret;
-
+DEBUG_NFC("%s: %d ", __func__, __LINE__);
 	pn54x_dev = filp->private_data;
 
 	if (count > MAX_BUFFER_SIZE)
@@ -323,8 +344,7 @@ static ssize_t pn54x_dev_write(struct file *filp, const char __user *buf,
 		pr_err("%s : failed to copy from user space\n", __func__);
 		return -EFAULT;
 	}
-
-	pr_debug("%s : writing %zu bytes.\n", __func__, count);
+DEBUG_NFC("%s : writing %zu bytes.\n", __func__, count);
 	/* Write data */
 	ret = i2c_master_send(pn54x_dev->client, tmp, count);
 	if (ret != count) {
@@ -359,7 +379,7 @@ static int pn54x_dev_release(struct inode *inode, struct file *filp)
 	// struct pn54x_dev *pn54x_dev = container_of(filp->private_data,
 	//										   struct pn54x_dev,
 	//										   pn54x_device);
-
+DEBUG_NFC("%s: %d ", __func__, __LINE__);
 	pr_info("%s : closing %d,%d\n", __func__, imajor(inode), iminor(inode));
 
 	// pn544_disable(pn54x_dev);
@@ -377,13 +397,13 @@ static long  pn54x_dev_ioctl(struct file *filp, unsigned int cmd,
 	case PN544_SET_PWR:
 		pr_err("hk 1111\n");
 		if (arg == 2) {
-			pr_err("hk 333\n");
+			pr_err("hk %s PN544_SET_PWR\n", __func__);
 			/* power on w/FW */
 			if (GPIO_UNUSED == pn544_enable(pn54x_dev, arg)) {
 				return GPIO_UNUSED;
 			}
 		} else if (arg == 1) {
-			pr_err("hk 4444\n");
+			pr_err("hk %s 4444\n", __func__);
 			/* power on */
 			pn544_enable(pn54x_dev, arg);
 		} else  if (arg == 0) {
@@ -396,11 +416,12 @@ static long  pn54x_dev_ioctl(struct file *filp, unsigned int cmd,
 		}
 		break;
 	case PN54X_CLK_REQ:
-		pr_err("hk 2222\n");
+		pr_err("hk %s PN54X_CLK_REQ arg arg 2222\n", __func__);
 		if(1 == arg){
 			pr_err("hk 666\n");
 			if(gpio_is_valid(pn54x_dev->clkreq_gpio)){
 				gpio_set_value(pn54x_dev->clkreq_gpio, 1);
+DEBUG_NFC("%s: %d pn54x_dev->clkreq_gpio %dset 1", __func__, __LINE__,pn54x_dev->clkreq_gpio);
 			}
 			else {
 				pr_err("%s Unused Clkreq GPIO %lu\n", __func__, arg);
@@ -411,6 +432,7 @@ static long  pn54x_dev_ioctl(struct file *filp, unsigned int cmd,
 			pr_err("hk 777\n");
 			if(gpio_is_valid(pn54x_dev->clkreq_gpio)){
 				gpio_set_value(pn54x_dev->clkreq_gpio, 0);
+DEBUG_NFC("%s: %d pn54x_dev->clkreq_gpio %dset 0", __func__, __LINE__,pn54x_dev->clkreq_gpio);
 			}
 			else {
 				pr_err("%s Unused Clkreq GPIO %lu\n", __func__, arg);
@@ -456,6 +478,7 @@ static int pn54x_get_pdata(struct device *dev,
 
 	/* make sure there is actually a device tree node */
 	node = dev->of_node;
+DEBUG_NFC("%s: %d ", __func__, __LINE__);
 	if (!node)
 		return -ENODEV;
 
@@ -630,7 +653,7 @@ static int pn54x_probe(struct i2c_client *client,
 		client->irq = ret;
 	}
 
-	pr_info("%s: request ven_gpio %d\n", __func__, pdata->ven_gpio);
+	DEBUG_NFC("%s: request ven_gpio %d\n", __func__, pdata->ven_gpio);
 	ret = gpio_request(pdata->ven_gpio, "nfc_ven");
 	if (ret){
 		pr_err("%s :not able to get GPIO ven_gpio\n", __func__);
@@ -638,7 +661,7 @@ static int pn54x_probe(struct i2c_client *client,
 	}
 
 	if (gpio_is_valid(pdata->firm_gpio)) {
-		pr_info("%s: request firm_gpio %d\n", __func__, pdata->firm_gpio);
+		DEBUG_NFC("%s: request firm_gpio %d\n", __func__, pdata->firm_gpio);
 		ret = gpio_request(pdata->firm_gpio, "nfc_firm");
 		if (ret){
 			pr_err("%s :not able to get GPIO firm_gpio\n", __func__);
@@ -647,7 +670,7 @@ static int pn54x_probe(struct i2c_client *client,
 	}
 
 	if (gpio_is_valid(pdata->clkreq_gpio)) {
-		pr_info("%s: request clkreq_gpio %d\n", __func__, pdata->clkreq_gpio);
+		DEBUG_NFC("%s: request clkreq_gpio %d\n", __func__, pdata->clkreq_gpio);
 		ret = gpio_request(pdata->clkreq_gpio, "nfc_clkreq");
 		if (ret){
 			pr_err("%s :not able to get GPIO clkreq_gpio\n", __func__);

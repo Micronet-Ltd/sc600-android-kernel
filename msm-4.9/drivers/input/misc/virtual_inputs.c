@@ -292,10 +292,10 @@ static void cradle_is_connected_work_fix(struct work_struct *work){
         status_curr = (cmd & 0x18) >> 3;
         if (status_curr != status_prev) {
             status_changed = 1;
-            delay_val = 0;
+            delay_val = 1000;
             //pr_notice("status was changed from %d to %d\n",status_prev, status_curr);
         } else {
-            delay_val = 1000;
+            delay_val = 2000;
         }
         //pr_notice("responce status%x\n", cmd);
         schedule_delayed_work(&vdev->virtual_input_init_work, delay_val?msecs_to_jiffies(delay_val):0);
@@ -330,7 +330,7 @@ static int __ref virtual_inputs_cradle_callback(struct notifier_block *nfb, unsi
     cancel_delayed_work(&vdev->virtual_input_init_work);
 
     if (vinputs->cradle_attached & 0x10) {
-        schedule_delayed_work(&vdev->virtual_input_init_work, 0); 
+        schedule_delayed_work(&vdev->virtual_input_init_work, 100); 
     } else if (vinputs->cradle_attached & 0x20) {
         if (!vdev->work.func) {
             vdev->reinit = 1;
@@ -659,7 +659,7 @@ static int __init virtual_inputs_init(void)
 
     if (fixed_mode) {
         vdev->virtual_inputs_cradle_notifier.notifier_call = virtual_inputs_cradle_callback;
- // BYU        cradle_register_notifier(&vdev->virtual_inputs_cradle_notifier);
+        cradle_register_notifier(&vdev->virtual_inputs_cradle_notifier);
     }
 
 	vdev->mdev = &vinputs_dev;
@@ -697,7 +697,7 @@ static int __init virtual_inputs_init(void)
     }else{
         INIT_DELAYED_WORK(&vdev->virtual_input_init_work, cradle_is_connected_work_fix);
         vdev->cradle_attached = 0;
-        schedule_delayed_work(&vdev->virtual_input_init_work, 0);
+        schedule_delayed_work(&vdev->virtual_input_init_work, 2000);
     }
     pr_info("%s:-\n", __func__);
 	return 0;

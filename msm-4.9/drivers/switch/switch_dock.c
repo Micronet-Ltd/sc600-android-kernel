@@ -661,6 +661,8 @@ static void dock_switch_work_func(struct work_struct *work)
 static void dock_switch_work_func_fix(struct work_struct *work)
 {
 	struct dock_switch_device *ds  = container_of(work, struct dock_switch_device, work);
+    static long long debounce_ignition = 0;
+    static int vign = 0;
     int val = 0;
     uint32_t cmd, fd;
     union power_supply_propval prop = {0,};
@@ -691,6 +693,40 @@ static void dock_switch_work_func_fix(struct work_struct *work)
         return;
     }
 
+
+    if (ktime_to_ms(ktime_get()) < debounce_ignition) {
+        if (ds->dock_active_l == gpio_get_value(ds->dock_pin) && wait_for_stable_signal(ds->dock_pin, 60, 0) < 1) {
+            val = 0;
+            ds->dock_type = e_dock_type_unspecified;
+            pr_notice("stm32/k20 detached %lld\n", ktime_to_ms(ktime_get()));
+        } else {
+            msleep_interruptible(3000);
+            cmd = 0;
+            transmit_err = hi_3w_tx_cmd(&cmd, 1);
+            pr_notice("hi 3w request %x (%x)\n", cmd, (cmd & 0x00FFFFFF));
+            pr_notice("Vign[%s]V\n", (cmd & 0x80)?"above 7":"below 6");
+            val = (ds->state)?ds->state:SWITCH_DOCK | SWITCH_ODOCK;
+            if (cmd & 0x80) {
+                val |= SWITCH_IGN;
+            } else if (vign) {
+                schedule_work(&ds->work);
+                return;
+            } else {
+                val &= ~SWITCH_IGN;
+            }
+        }
+    } else if (debounce_ignition) {
+        val = (ds->state)?ds->state:SWITCH_DOCK | SWITCH_ODOCK;
+        if (vign) {
+            val &= ~SWITCH_IGN;
+        } else {
+            val |= SWITCH_IGN;
+        }
+    }
+
+    if (debounce_ignition) {
+        goto debounced; 
+    }
     // Vladimir:
     // PATERN_INTERIM should be replaced by correct
     //
@@ -786,7 +822,7 @@ static void dock_switch_work_func_fix(struct work_struct *work)
                 val |= SWITCH_ODOCK;
             }
         } else if (val > 1 && (val < SC_IG_LOW)) {
-            pr_notice("ignition off %lld\n", ktime_to_ms(ktime_get()));
+            //pr_notice("ignition off %lld\n", ktime_to_ms(ktime_get()));
             val = SWITCH_DOCK; 
             if (e_dock_type_smart == ds->dock_type) {
                 val |= SWITCH_EDOCK;
@@ -803,23 +839,23 @@ static void dock_switch_work_func_fix(struct work_struct *work)
         }
 
         if (0 == (val & SWITCH_EDOCK)) {
-            cmd = 0; 
             cmd = 2<<24;
-            pr_notice("hi 3w request %x\n", (cmd));
             transmit_err = hi_3w_tx_cmd(&cmd, 1);
-        	pr_notice("hi 3w answer %x\n", (cmd & 0x00FFFFFF));
+            pr_notice("hi 3w request %x (%x)\n", cmd, (cmd & 0x00FFFFFF));
             while (transmit_err) {
-                pr_notice("hi 3w transmit error %d\n", transmit_err);
-                cmd = 0;
                 cmd = 2<<24;
                 msleep(10);
                 transmit_err = hi_3w_tx_cmd(&cmd, 1);
                 if (++err_cnt>=15) {
                     err_cnt = 0;
+                    pr_notice("hi 3w request error %d\n", transmit_err);
                     break;
                 }
             }
-            pr_notice("transmit is ok\n");
+            if (!transmit_err) {
+                pr_notice("transmit is ok\n"); 
+            }
+
             fd = sys_open("/proc/mcu_version", O_WRONLY, 0);
             if (fd >= 0) {
                 sprintf(ver, "%d.%d.%d", (cmd >> 16) & 0xFF, (cmd >> 8) & 0xFF, cmd & 0xFF);
@@ -829,15 +865,27 @@ static void dock_switch_work_func_fix(struct work_struct *work)
             }
             if (((cmd >> 16) & 0xFF) > 0) {
                 cmd = 0x40 << 24;
-                pr_notice("hi 3w request %x\n", (cmd));
                 transmit_err = hi_3w_tx_cmd(&cmd, 1);
-                pr_notice("hi 3w answer %x\n", (cmd & 0x00FFFFFF));
+                pr_notice("hi 3w request %x (%x)\n", cmd, (cmd & 0x00FFFFFF));
                 fd = sys_open("/proc/vib_profile", O_WRONLY, 0); 
                 if (fd >= 0) {
                     sprintf(ver, "%d", ((cmd >> 16) & 0xFF) | ((cmd >> 8) & 0xFF) | (cmd & 0xFF));
                     pr_notice("stm32 vib profile %s\n", ver);
                     sys_write(fd, ver, strlen(ver));
                     sys_close(fd);
+                }
+            }
+            if (0 == (val & SWITCH_IGN)) {
+                cmd = 0;
+                transmit_err = hi_3w_tx_cmd(&cmd, 1);
+                pr_notice("hi 3w request %x (%x)\n", cmd, (cmd & 0x00FFFFFF));
+                pr_notice("Vin [%s]V, Vbus[%s], Vign[%s]V\n", (cmd & 1)?"above 7":"below 6", (cmd & 2)?"ok":"failed", (cmd & 0x80)?"above 7":"below 6");
+                if (cmd & 0x80) {
+                    val |= SWITCH_IGN;
+                } else {
+                    pr_notice("Debounce Vign[%s]V\n", (cmd & 0x80)?"above 7":"below 6");
+                    debounce_ignition = ktime_to_ms(ktime_get()) + 15000;
+                    vign = (ds->state & SWITCH_IGN)?0:1;
                 }
             }
             prop.intval = POWER_SUPPLY_SCOPE_DEVICE;
@@ -847,6 +895,15 @@ static void dock_switch_work_func_fix(struct work_struct *work)
             } else {
                 prop.intval = POWER_SUPPLY_SCOPE_SYSTEM;
             }
+            if (ufp_only) {
+                fd = sys_open("/proc/mcu_version", O_WRONLY, 0);
+                if (fd >= 0) {
+                    sprintf(ver, "A.8.x.x");
+                    pr_notice("stm32 sw ver %s\n", ver);
+                    sys_write(fd, ver, strlen(ver));
+                    sys_close(fd);
+                }
+            }
         }
         power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
         prop.intval = 1500*1000;
@@ -854,6 +911,13 @@ static void dock_switch_work_func_fix(struct work_struct *work)
     }
     mutex_unlock(&ds->lock);
 
+    if (debounce_ignition) {
+        schedule_work(&ds->work);
+        return;
+    }
+
+debounced:
+    debounce_ignition = 0;
     if (ds->sched_irq & SWITCH_IGN) {
         pr_notice("enable ign/dock monitor irq[%d]\n", ds->dock_irq);
         ds->sched_irq &= ~SWITCH_IGN;

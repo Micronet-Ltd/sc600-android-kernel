@@ -1011,12 +1011,12 @@
 				/* sleep state */
 				mux {
 					/* GPIO 17 NFC Read Interrupt */
-					pins = "gpio17";
+					pins = "gpio90";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio17";
+					pins = "gpio90";
 					drive-strength = <2>; /* 2 MA */
 					bias-pull-up;
 				};
@@ -1027,12 +1027,12 @@
 				mux {
 					/* 16: NFC ENABLE 62: FW DNLD */
 					/* 141: ESE Enable */
-					pins = "gpio9", "gpio8", "gpio141";
+					pins = "gpio9";/*, "gpio8", "gpio141";*/
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio9", "gpio8", "gpio141";
+					pins = "gpio9";/*, "gpio8", "gpio141";*/
 					drive-strength = <2>; /* 2 MA */
 					bias-pull-up;
 				};
@@ -1043,19 +1043,19 @@
 				mux {
 					/* 16: NFC ENABLE 62: FW DNLD */
 					/* 141: ESE Enable */
-					pins = "gpio9", "gpio8", "gpio141";
+					pins = "gpio9";/*, "gpio8", "gpio141";*/
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio9", "gpio8", "gpio141";
+					pins = "gpio9";/*, "gpio8", "gpio141";*/
 					drive-strength = <2>; /* 2 MA */
 					bias-disable;
 				};
 			};
 		};
 
-		wcnss_pmux_5wire {
+ 		wcnss_pmux_5wire {
 			/* Active configuration of bus pins */
 			wcnss_default: wcnss_default {
 				wcss_wlan2 {

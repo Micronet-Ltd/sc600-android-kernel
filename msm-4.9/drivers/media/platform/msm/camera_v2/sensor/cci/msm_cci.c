@@ -41,8 +41,9 @@
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
 #undef CCI_DBG
+//#define MSM_CCI_DEBUG 1
 #ifdef MSM_CCI_DEBUG
-#define CCI_DBG(fmt, args...) pr_err(fmt, ##args)
+#define CCI_DBG(fmt, args...) pr_notice(fmt, ##args)
 #else
 #define CCI_DBG(fmt, args...) pr_debug(fmt, ##args)
 #endif
@@ -2100,7 +2101,7 @@ static int msm_cci_probe(struct platform_device *pdev)
 	v4l2_set_subdevdata(&new_cci_dev->msm_sd.sd, new_cci_dev);
 	platform_set_drvdata(pdev, &new_cci_dev->msm_sd.sd);
 
-	CDBG("%s sd %pK\n", __func__, &new_cci_dev->msm_sd.sd);
+	pr_notice("%s sd %pK\n", __func__, &new_cci_dev->msm_sd.sd);
 	if (pdev->dev.of_node)
 		of_property_read_u32((&pdev->dev)->of_node,
 			"cell-index", &pdev->id);
@@ -2128,7 +2129,7 @@ static int msm_cci_probe(struct platform_device *pdev)
 		rc = -ENODEV;
 		goto cci_no_resource;
 	}
-	CDBG("%s line %d cci irq start %d end %d\n", __func__,
+	pr_notice("%s line %d cci irq start %d end %d\n", __func__,
 		__LINE__,
 		(int) new_cci_dev->irq->start,
 		(int) new_cci_dev->irq->end);
@@ -2182,7 +2183,7 @@ static int msm_cci_probe(struct platform_device *pdev)
 		if (!new_cci_dev->write_wq[i])
 			pr_err("Failed to create write wq\n");
 	}
-	CDBG("%s cci subdev %pK\n", __func__, &new_cci_dev->msm_sd.sd);
+	pr_notice("%s cci subdev %pK\n", __func__, &new_cci_dev->msm_sd.sd);
 	CDBG("%s line %d\n", __func__, __LINE__);
 	return 0;
 

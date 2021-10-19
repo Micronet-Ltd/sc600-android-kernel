@@ -277,7 +277,7 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
         return;
     }
 
-    if ((pwrl->pwr_lost_pin_l != val) || (usb_online && (0 == pwrl->cradle_attached))) {
+    if ((pwrl->pwr_lost_pin_l != val) || (usb_online && (0 == pwrl->cradle_attached)) || (pwrl->pwr_lost_off_cd < 0)) {
         enable_irq_safe(pwrl->pwr_lost_irq, 0);
         spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags);
         pwrl->pwr_lost_wan_d = pwrl->pwr_lost_wlan_d = pwrl->pwr_lost_off_d = -1;
@@ -634,7 +634,7 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
     pwrl->batt_is_scap = -1;
     c = of_get_property(np, "compatible", 0);
     if (c) {
-        pr_err("node is finded\n");
+        pr_err("node is found\n");
     }
 
     if (c && 0 == strncmp("mcn,pwr-loss-mon-scap", c, sizeof("mcn,pwr-loss-mon-scap") - sizeof(char))) {
@@ -841,7 +841,7 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
 
 		pwrl->pwr_lost_timer = -1;
 
-        schedule_delayed_work(&pwrl->pwr_lost_work, (pwrl->pwr_lost_off_cd)?msecs_to_jiffies(pwrl->pwr_lost_off_cd): 0);
+        schedule_delayed_work(&pwrl->pwr_lost_work, (pwrl->pwr_lost_off_cd > 0)?msecs_to_jiffies(pwrl->pwr_lost_off_cd): 0);
         power_ok_register_notifier(&pwrl->pwr_loss_mon_vbus_notifier);
 
         pwrl->sys_ready = 1;

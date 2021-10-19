@@ -343,6 +343,10 @@
 		reg = <0x4ab000 0x4>,
 			<0x193d100 0x4>;
 		reg-names = "pshold-base", "tcsr-boot-misc-detect";
+		pinctrl-names = "pwr_led_active", "pwr_led_suspend";
+		pinctrl-0 = <&pwr_led_active>;
+		pinctrl-1 = <&pwr_led_suspend>;
+		mcn,pwr-led = <&tlmm 97 GPIO_ACTIVE_HIGH>;
 	};
 
 	qcom,mpm2-sleep-counter@4a3000 {
@@ -628,10 +632,10 @@
 		clocks = <&clock_gcc clk_gcc_blsp1_uart2_apps_clk>,
 			<&clock_gcc clk_gcc_blsp1_ahb_clk>;
 		clock-names = "core", "iface";
-		pinctrl-names = "default","sleep";
+		/*pinctrl-names = "default","sleep";
 		pinctrl-0 = <&uart4_active>;
-		pinctrl-1 = <&uart4_sleep>;
-		status = "ok";
+		pinctrl-1 = <&uart4_sleep>;*/
+		status = "disabled";
 	};
 
 	spmi_bus: qcom,spmi@200f000 {

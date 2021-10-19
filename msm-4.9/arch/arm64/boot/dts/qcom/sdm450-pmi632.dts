@@ -24,6 +24,12 @@
 	qcom,pmic-name = "PMI632";
 };
 
+&pm8953_l17 {
+	regulator-min-microvolt = <3000000>;
+	regulator-max-microvolt = <3300000>;
+	qcom,init-voltage = <3000000>;
+};
+
 &soc {
 	virtual_leds {
 		compatible = "virtual-leds-fixed";
@@ -40,8 +46,8 @@
 		pinctrl-names = "watchdog_pin_active", "watchdog_pin_suspend";
 		pinctrl-0 = <&watchdog_pin_active>;		
 		pinctrl-1 = <&watchdog_pin_suspend>;
-		mcn,toggle-pin = <&tlmm 33 0>;
-		/*mcn,rf-kill-pin = <&tlmm 63 0>;*/
+		mcn,toggle-pin = <&tlmm 36 0>;
+		mcn,rf-kill-pin = <&tlmm 99 0>;
 		mcn,high-delay=<1000>;
 		mcn,low-delay=<1000>;
 		status = "okay";
@@ -52,25 +58,31 @@
 		pinctrl-names = "dock_pins_active", "dock_pin_suspend";
 		pinctrl-0 = <&dock_pins_active>;
 		pinctrl-1 = <&dock_pin_suspend>;
-		mcn,dock-pin = <&tlmm 36 GPIO_ACTIVE_LOW>;
+		mcn,dock-pin = <&tlmm 21 GPIO_ACTIVE_LOW>;
 		/* usb switch hw controlled by vbus_cradle signal */
-		/*mcn,usb-switch-pin = <&tlmm 12 GPIO_ACTIVE_HIGH>;*/
+		mcn,usb-switch-pin = <&tlmm 18 GPIO_ACTIVE_HIGH>;
 		/*mcn,otg-en-pin = <&tlmm 97 GPIO_ACTIVE_HIGH>;*/
-		/*mcn,mic-switch-pin = <&tlmm 47 GPIO_ACTIVE_HIGH>;*/
+		mcn,mic-switch-pin = <&tlmm 19 GPIO_ACTIVE_HIGH>;
+		tuner-supply = <&pm8953_l10>;
+		ldoa2-supply = <&pm8953_l2>;
+		ldoa6-supply = <&pm8953_l6>;
+		ldoa17-supply = <&pm8953_l17>;
+		ldoa22-supply = <&pm8953_l22>;
+		ldoa23-supply = <&pm8953_l23>;
 		interrupt-names = "cradle-detect";
 		interrupt-parent = <&tlmm>;
-		interrupts = <&tlmm 36 0>;
+		interrupts = <&tlmm 21 0>;
 		status = "okay";
 	};
 
 	hi3w {
 		compatible = "mcn,hi-3w";
-		pinctrl-names = "hi_3w_pins_active", "hi_3w_pin_suspend";
+		pinctrl-names = "default", "sleep";
 		pinctrl-0 = <&hi_3w_pins_active>;
 		pinctrl-1 = <&hi_3w_pin_suspend>;
 		mcn,3w-clock-pin = <&tlmm 13 GPIO_ACTIVE_LOW>;
-		mcn,3w-miso-pin = <&tlmm 90 GPIO_ACTIVE_LOW>;
-		mcn,3w-mosi-pin = <&tlmm 22 GPIO_ACTIVE_LOW>;
+		mcn,3w-miso-pin = <&tlmm 89 GPIO_ACTIVE_LOW>;
+		mcn,3w-mosi-pin = <&tlmm 2 GPIO_ACTIVE_LOW>;
 		status = "okay";
 	};
 
@@ -79,10 +91,9 @@
 		pinctrl-names = "dev_info_active", "dev_info_suspend";
 		pinctrl-0 = <&dev_info_active>;
 		pinctrl-1 = <&dev_info_suspend>;
-		/* wait for board prototype */
-		/* mcn,board-id-0 = <&tlmm 94 GPIO_ACTIVE_LOW>;
-		mcn,board-id-1 = <&tlmm 95 GPIO_ACTIVE_LOW>;
-		mcn,board-id-2 = <&tlmm 96 GPIO_ACTIVE_LOW>; */
+		mcn,board-id-0 = <&tlmm 128 GPIO_ACTIVE_LOW>;
+		mcn,board-id-1 = <&tlmm 87 GPIO_ACTIVE_LOW>;
+		mcn,board-id-2 = <&tlmm 96 GPIO_ACTIVE_LOW>; 
 		status = "okay";
 	};
 
@@ -94,7 +105,8 @@
 		mcn,pwr-loss-mon = <&tlmm 98 GPIO_ACTIVE_LOW>;
 		mcn,wan-off-delay = <0>;
 		mcn,wlan-off-delay = <0>;
-		mcn,plat-off-delay = <180000>;
+		/*mcn,plat-off-delay = <180000>;*/
+		mcn,plat-off-delay = <0xFFFFFFFF>;
 		interrupt-names = "pwr-loss";
 		interrupt-parent = <&tlmm>;
 		interrupts = <&tlmm 98 0>;
@@ -109,8 +121,7 @@
 	gpio_keys {
 		user_btn {
 			label = "F24";
-			/* wait for board prototype */
-			/*gpios = <&tlmm 25 0x1>;*/
+			gpios = <&tlmm 25 0x1>;
 			linux,input-type = <1>;
 			linux,code = <194>;
 			debounce-interval = <15>;

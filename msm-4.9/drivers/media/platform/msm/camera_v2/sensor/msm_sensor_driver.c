@@ -939,14 +939,14 @@ int32_t msm_sensor_driver_probe(void *setting,
 	}
 
 	/* Print slave info */
-	CDBG("camera id %d Slave addr 0x%X addr_type %d\n",
+	pr_notice("camera id %d Slave addr 0x%X addr_type %d\n",
 		slave_info->camera_id, slave_info->slave_addr,
 		slave_info->addr_type);
-	CDBG("sensor_id_reg_addr 0x%X sensor_id 0x%X sensor id mask %d",
+	pr_notice("sensor_id_reg_addr 0x%X sensor_id 0x%X sensor id mask %d\n",
 		slave_info->sensor_id_info.sensor_id_reg_addr,
 		slave_info->sensor_id_info.sensor_id,
 		slave_info->sensor_id_info.sensor_id_mask);
-	CDBG("power up size %d power down size %d\n",
+	pr_notice("power up size %d power down size %d\n",
 		slave_info->power_setting_array.size,
 		slave_info->power_setting_array.size_down);
 	CDBG("position %d",
@@ -1136,7 +1136,7 @@ CSID_TG:
 		goto free_camera_info;
 	}
 
-	pr_err("%s probe succeeded", slave_info->sensor_name);
+	pr_notice("%s probe succeeded\n", slave_info->sensor_name);
 
 	s_ctrl->bypass_video_node_creation =
 		slave_info->bypass_video_node_creation;

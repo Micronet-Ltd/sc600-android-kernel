@@ -183,12 +183,13 @@ int msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 	if (s_ctrl->set_mclk_23880000)
 		msm_sensor_adjust_mclk(power_info);
 
-	CDBG("Sensor %d tagged as %s\n", s_ctrl->id,
+	pr_notice("Sensor %d tagged as %s\n", s_ctrl->id,
 		(s_ctrl->is_secure)?"SECURE":"NON-SECURE");
 
 	for (retry = 0; retry < 3; retry++) {
 		if (s_ctrl->is_secure) {
 			rc = msm_camera_tz_i2c_power_up(sensor_i2c_client);
+            pr_notice("Secure Sensor %d use cci\n", s_ctrl->id);
 			if (rc < 0) {
 #ifdef CONFIG_MSM_SEC_CCI_DEBUG
 				CDBG("Secure Sensor %d use cci\n", s_ctrl->id);

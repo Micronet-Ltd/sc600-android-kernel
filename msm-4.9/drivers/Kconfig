@@ -214,4 +214,6 @@ source "drivers/tee/Kconfig"
 
 source "drivers/gpioclk/Kconfig"
 
+source "drivers/nxp-pn5xx/Kconfig"
+
 endmenu

@@ -675,7 +675,7 @@ int msm_camera_config_single_vreg(struct device *dev,
 	}
 
 	if (config) {
-		CDBG("%s enable %s\n", __func__, vreg_name);
+		pr_notice("%s enable %s\n", __func__, vreg_name);
 		*reg_ptr = regulator_get(dev, vreg_name);
 		if (IS_ERR(*reg_ptr)) {
 			pr_err("%s: %s get failed\n", __func__, vreg_name);
@@ -683,7 +683,7 @@ int msm_camera_config_single_vreg(struct device *dev,
 			goto vreg_get_fail;
 		}
 		if (regulator_count_voltages(*reg_ptr) > 0) {
-			CDBG("%s: voltage min=%d, max=%d\n",
+			pr_notice("%s: voltage min=%d, max=%d\n",
 				__func__, cam_vreg->min_voltage,
 				cam_vreg->max_voltage);
 			rc = regulator_set_voltage(
@@ -712,7 +712,7 @@ int msm_camera_config_single_vreg(struct device *dev,
 			goto vreg_unconfig;
 		}
 	} else {
-		CDBG("%s disable %s\n", __func__, vreg_name);
+		pr_notice("%s disable %s\n", __func__, vreg_name);
 		if (*reg_ptr) {
 			CDBG("%s disable %s\n", __func__, vreg_name);
 			regulator_disable(*reg_ptr);

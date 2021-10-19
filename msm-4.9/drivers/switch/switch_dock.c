@@ -22,6 +22,7 @@
 #include <linux/workqueue.h>
 #include <linux/pm_wakeup.h>
 
+#include <linux/regulator/consumer.h>
 #include <linux/notifier.h>
 #include <linux/power_supply.h>
 
@@ -117,6 +118,8 @@ struct dock_switch_device {
     struct  dock_switch_attr attr_outs_mask_set;
     struct  dock_switch_attr attr_outs_mask_clr;
     struct  dock_switch_attr attr_dbg_state;
+    struct  dock_switch_attr attr_tuner_state;
+    struct  dock_switch_attr attr_cam_ldos_state;
     //////////////barak/////////////////////
     struct  dock_switch_attr attr_J1708_en;
     struct  dock_switch_attr attr_rs485_en;
@@ -143,6 +146,12 @@ struct dock_switch_device {
     long long status_change_guard;
     int resuming;
     int vbus_supplied;
+    struct regulator *tuner_reg;
+    struct regulator *ldoa2_reg;
+    struct regulator *ldoa6_reg;
+    struct regulator *ldoa17_reg;
+    struct regulator *ldoa22_reg;
+    struct regulator *ldoa23_reg;
 };
 
 #include "../gpio/gpiolib.h"
@@ -652,6 +661,8 @@ static void dock_switch_work_func(struct work_struct *work)
 static void dock_switch_work_func_fix(struct work_struct *work)
 {
 	struct dock_switch_device *ds  = container_of(work, struct dock_switch_device, work);
+    static long long debounce_ignition = 0;
+    static int vign = 0;
     int val = 0;
     uint32_t cmd, fd;
     union power_supply_propval prop = {0,};
@@ -682,6 +693,40 @@ static void dock_switch_work_func_fix(struct work_struct *work)
         return;
     }
 
+
+    if (ktime_to_ms(ktime_get()) < debounce_ignition) {
+        if (ds->dock_active_l == gpio_get_value(ds->dock_pin) && wait_for_stable_signal(ds->dock_pin, 60, 0) < 1) {
+            val = 0;
+            ds->dock_type = e_dock_type_unspecified;
+            pr_notice("stm32/k20 detached %lld\n", ktime_to_ms(ktime_get()));
+        } else {
+            msleep_interruptible(3000);
+            cmd = 0;
+            transmit_err = hi_3w_tx_cmd(&cmd, 1);
+            pr_notice("hi 3w request %x (%x)\n", cmd, (cmd & 0x00FFFFFF));
+            pr_notice("Vign[%s]V\n", (cmd & 0x80)?"above 7":"below 6");
+            val = (ds->state)?ds->state:SWITCH_DOCK | SWITCH_ODOCK;
+            if (cmd & 0x80) {
+                val |= SWITCH_IGN;
+            } else if (vign) {
+                schedule_work(&ds->work);
+                return;
+            } else {
+                val &= ~SWITCH_IGN;
+            }
+        }
+    } else if (debounce_ignition) {
+        val = (ds->state)?ds->state:SWITCH_DOCK | SWITCH_ODOCK;
+        if (vign) {
+            val &= ~SWITCH_IGN;
+        } else {
+            val |= SWITCH_IGN;
+        }
+    }
+
+    if (debounce_ignition) {
+        goto debounced; 
+    }
     // Vladimir:
     // PATERN_INTERIM should be replaced by correct
     //
@@ -777,7 +822,7 @@ static void dock_switch_work_func_fix(struct work_struct *work)
                 val |= SWITCH_ODOCK;
             }
         } else if (val > 1 && (val < SC_IG_LOW)) {
-            pr_notice("ignition off %lld\n", ktime_to_ms(ktime_get()));
+            //pr_notice("ignition off %lld\n", ktime_to_ms(ktime_get()));
             val = SWITCH_DOCK; 
             if (e_dock_type_smart == ds->dock_type) {
                 val |= SWITCH_EDOCK;
@@ -794,23 +839,23 @@ static void dock_switch_work_func_fix(struct work_struct *work)
         }
 
         if (0 == (val & SWITCH_EDOCK)) {
-            cmd = 0; 
             cmd = 2<<24;
-            pr_notice("hi 3w request %x\n", (cmd));
             transmit_err = hi_3w_tx_cmd(&cmd, 1);
-        	pr_notice("hi 3w answer %x\n", (cmd & 0x00FFFFFF));
+            pr_notice("hi 3w request %x (%x)\n", cmd, (cmd & 0x00FFFFFF));
             while (transmit_err) {
-                pr_notice("hi 3w transmit error %d\n", transmit_err);
-                cmd = 0;
                 cmd = 2<<24;
                 msleep(10);
                 transmit_err = hi_3w_tx_cmd(&cmd, 1);
                 if (++err_cnt>=15) {
                     err_cnt = 0;
+                    pr_notice("hi 3w request error %d\n", transmit_err);
                     break;
                 }
             }
-            pr_notice("transmit is ok\n");
+            if (!transmit_err) {
+                pr_notice("transmit is ok\n"); 
+            }
+
             fd = sys_open("/proc/mcu_version", O_WRONLY, 0);
             if (fd >= 0) {
                 sprintf(ver, "%d.%d.%d", (cmd >> 16) & 0xFF, (cmd >> 8) & 0xFF, cmd & 0xFF);
@@ -820,9 +865,8 @@ static void dock_switch_work_func_fix(struct work_struct *work)
             }
             if (((cmd >> 16) & 0xFF) > 0) {
                 cmd = 0x40 << 24;
-                pr_notice("hi 3w request %x\n", (cmd));
                 transmit_err = hi_3w_tx_cmd(&cmd, 1);
-                pr_notice("hi 3w answer %x\n", (cmd & 0x00FFFFFF));
+                pr_notice("hi 3w request %x (%x)\n", cmd, (cmd & 0x00FFFFFF));
                 fd = sys_open("/proc/vib_profile", O_WRONLY, 0); 
                 if (fd >= 0) {
                     sprintf(ver, "%d", ((cmd >> 16) & 0xFF) | ((cmd >> 8) & 0xFF) | (cmd & 0xFF));
@@ -831,12 +875,34 @@ static void dock_switch_work_func_fix(struct work_struct *work)
                     sys_close(fd);
                 }
             }
-            prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+            if (0 == (val & SWITCH_IGN)) {
+                cmd = 0;
+                transmit_err = hi_3w_tx_cmd(&cmd, 1);
+                pr_notice("hi 3w request %x (%x)\n", cmd, (cmd & 0x00FFFFFF));
+                pr_notice("Vin [%s]V, Vbus[%s], Vign[%s]V\n", (cmd & 1)?"above 7":"below 6", (cmd & 2)?"ok":"failed", (cmd & 0x80)?"above 7":"below 6");
+                if (cmd & 0x80) {
+                    val |= SWITCH_IGN;
+                } else {
+                    pr_notice("Debounce Vign[%s]V\n", (cmd & 0x80)?"above 7":"below 6");
+                    debounce_ignition = ktime_to_ms(ktime_get()) + 15000;
+                    vign = (ds->state & SWITCH_IGN)?0:1;
+                }
+            }
+            prop.intval = POWER_SUPPLY_SCOPE_DEVICE;
         } else {
             if (allow_ufp || ufp_only) {
                 prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN; 
             } else {
                 prop.intval = POWER_SUPPLY_SCOPE_SYSTEM;
+            }
+            if (ufp_only) {
+                fd = sys_open("/proc/mcu_version", O_WRONLY, 0);
+                if (fd >= 0) {
+                    sprintf(ver, "A.8.x.x");
+                    pr_notice("stm32 sw ver %s\n", ver);
+                    sys_write(fd, ver, strlen(ver));
+                    sys_close(fd);
+                }
             }
         }
         power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
@@ -845,6 +911,13 @@ static void dock_switch_work_func_fix(struct work_struct *work)
     }
     mutex_unlock(&ds->lock);
 
+    if (debounce_ignition) {
+        schedule_work(&ds->work);
+        return;
+    }
+
+debounced:
+    debounce_ignition = 0;
     if (ds->sched_irq & SWITCH_IGN) {
         pr_notice("enable ign/dock monitor irq[%d]\n", ds->dock_irq);
         ds->sched_irq &= ~SWITCH_IGN;
@@ -1213,6 +1286,163 @@ static ssize_t dock_switch_dbg_state_store(struct device *dev, struct device_att
     return err; 
 }
 
+static ssize_t dock_switch_tuner_state_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
+    struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
+
+    return sprintf(buf, "%d\n", (int)(!IS_ERR_OR_NULL(ds->tuner_reg)));
+}
+
+static ssize_t dock_switch_tuner_state_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
+    struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
+    int err, i;
+
+    err = kstrtos32(buf, 10, &i);
+
+    if (0 == err) {
+        if (i > 0) {
+            if (IS_ERR_OR_NULL(ds->tuner_reg)) 
+                ds->tuner_reg = devm_regulator_get_optional(ds->pdev, "tuner");
+
+            if (IS_ERR(ds->tuner_reg) && PTR_ERR(ds->tuner_reg) == -EPROBE_DEFER) {
+                /* regulators may not be ready, so retry again later */
+                ds->tuner_reg = 0;
+            } else {
+                err = regulator_set_voltage(ds->tuner_reg, 2800000, 2850000);
+                err = regulator_enable(ds->tuner_reg);
+            }
+        } else {
+            if (!IS_ERR_OR_NULL(ds->tuner_reg)) {
+                err = regulator_disable(ds->tuner_reg);
+                devm_regulator_put(ds->tuner_reg);
+            }
+            ds->tuner_reg = 0;
+        }
+    }
+
+
+    return count; 
+}
+
+static ssize_t dock_switch_cam_ldos_state_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
+    struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
+
+    return sprintf(buf, "ldoa2[%d], ldoa6[%d], ldoa17[%d], ldoa22[%d], ldoa23[%d]\n",
+                   (int)(!IS_ERR_OR_NULL(ds->ldoa2_reg)),
+                   (int)(!IS_ERR_OR_NULL(ds->ldoa6_reg)),
+                   (int)(!IS_ERR_OR_NULL(ds->ldoa17_reg)),
+                   (int)(!IS_ERR_OR_NULL(ds->ldoa22_reg)),
+                   (int)(!IS_ERR_OR_NULL(ds->ldoa23_reg)));
+}
+
+void en_all_cam_ldos(struct dock_switch_device *ds, int en)
+{
+    int err = 0;
+
+    if (en > 0) {
+        if (IS_ERR_OR_NULL(ds->ldoa2_reg)) 
+            ds->ldoa2_reg = devm_regulator_get_optional(ds->pdev, "ldoa2");
+
+        if (IS_ERR(ds->ldoa2_reg) && PTR_ERR(ds->ldoa2_reg) == -EPROBE_DEFER) {
+            /* regulators may not be ready, so retry again later */
+            ds->ldoa2_reg = 0;
+        } else {
+            err = regulator_set_voltage(ds->ldoa2_reg, 975000, 1175000);
+            err = regulator_enable(ds->ldoa2_reg);
+        }
+
+        if (IS_ERR_OR_NULL(ds->ldoa6_reg)) 
+            ds->ldoa6_reg = devm_regulator_get_optional(ds->pdev, "ldoa6");
+
+        if (IS_ERR(ds->ldoa6_reg) && PTR_ERR(ds->ldoa6_reg) == -EPROBE_DEFER) {
+            /* regulators may not be ready, so retry again later */
+            ds->ldoa6_reg = 0;
+        } else {
+            err = regulator_set_voltage(ds->ldoa6_reg, 1800000, 1800000);
+            err = regulator_enable(ds->ldoa6_reg);
+        }
+
+        if (IS_ERR_OR_NULL(ds->ldoa17_reg))
+            ds->ldoa17_reg = devm_regulator_get_optional(ds->pdev, "ldoa17");
+
+        if (IS_ERR(ds->ldoa17_reg) && PTR_ERR(ds->ldoa17_reg) == -EPROBE_DEFER) {
+            /* regulators may not be ready, so retry again later */
+            ds->ldoa17_reg = 0;
+        } else {
+            err = regulator_set_voltage(ds->ldoa17_reg, 3000000, 3300000);
+            err = regulator_enable(ds->ldoa17_reg);
+        }
+
+        if (IS_ERR_OR_NULL(ds->ldoa22_reg))
+            ds->ldoa22_reg = devm_regulator_get_optional(ds->pdev, "ldoa22");
+
+        if (IS_ERR(ds->ldoa22_reg) && PTR_ERR(ds->ldoa22_reg) == -EPROBE_DEFER) {
+            /* regulators may not be ready, so retry again later */
+            ds->ldoa22_reg = 0;
+        } else {
+            err = regulator_set_voltage(ds->ldoa22_reg, 2800000, 2800000);
+            err = regulator_enable(ds->ldoa22_reg);
+        }
+
+        if (IS_ERR_OR_NULL(ds->ldoa23_reg))
+            ds->ldoa23_reg = devm_regulator_get_optional(ds->pdev, "ldoa23");
+
+        if (IS_ERR(ds->ldoa23_reg) && PTR_ERR(ds->ldoa22_reg) == -EPROBE_DEFER) {
+            /* regulators may not be ready, so retry again later */
+            ds->ldoa23_reg = 0;
+        } else {
+            err = regulator_set_voltage(ds->ldoa23_reg, 975000, 1225000);
+            err = regulator_enable(ds->ldoa23_reg);
+        }
+    } else {
+        if (!IS_ERR_OR_NULL(ds->ldoa2_reg)) {
+            err = regulator_disable(ds->ldoa2_reg);
+            devm_regulator_put(ds->ldoa2_reg);
+        }
+        ds->ldoa2_reg = 0;
+        if (!IS_ERR_OR_NULL(ds->ldoa6_reg)) {
+            err = regulator_disable(ds->ldoa6_reg);
+            devm_regulator_put(ds->ldoa6_reg);
+        }
+        ds->ldoa6_reg = 0;
+        if (!IS_ERR_OR_NULL(ds->ldoa17_reg)) {
+            err = regulator_disable(ds->ldoa17_reg);
+            devm_regulator_put(ds->ldoa17_reg);
+        }
+        ds->ldoa17_reg = 0;
+        if (!IS_ERR_OR_NULL(ds->ldoa22_reg)) {
+            err = regulator_disable(ds->ldoa22_reg);
+            devm_regulator_put(ds->ldoa22_reg);
+        }
+        ds->ldoa22_reg = 0;
+        if (!IS_ERR_OR_NULL(ds->ldoa23_reg)) {
+            err = regulator_disable(ds->ldoa23_reg);
+            devm_regulator_put(ds->ldoa23_reg);
+        }
+        ds->ldoa23_reg = 0;
+    }
+}
+
+static ssize_t dock_switch_cam_ldos_state_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
+    struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
+    int err, i;
+
+    err = kstrtos32(buf, 10, &i);
+
+    if (0 == err) {
+        en_all_cam_ldos(ds, i);
+    }
+
+    return count; 
+}
+
 static int gpc_lable_match(struct gpio_chip *gpc, void *lbl)
 {
 	return !strcmp(gpc->label, lbl);
@@ -1470,7 +1700,7 @@ static int dock_switch_probe(struct platform_device *pdev)
 
         err = of_get_named_gpio_flags(np, "mcn,mb-ind-pin", 0, (enum of_gpio_flags *)&ds->mb_ind_l);
         if (!gpio_is_valid(err)) {
-            pr_err("ivalid docking pin\n");
+            pr_err("invalid mb-ind pin\n");
             err = -1;
         }
         ds->mb_ind_pin = err;
@@ -1667,6 +1897,29 @@ static int dock_switch_probe(struct platform_device *pdev)
         ds->attr_dbg_state.attr.store = dock_switch_dbg_state_store;
         sysfs_attr_init(&ds->attr_dbg_state.attr.attr);
         device_create_file((&ds->sdev)->dev, &ds->attr_dbg_state.attr);
+
+        ds->tuner_reg = 0;
+        snprintf(ds->attr_tuner_state.name, sizeof(ds->attr_tuner_state.name) - 1, "tuner_en");
+        ds->attr_tuner_state.attr.attr.name = ds->attr_tuner_state.name;
+        ds->attr_tuner_state.attr.attr.mode = S_IRUGO|S_IWUGO;
+        ds->attr_tuner_state.attr.show = dock_switch_tuner_state_show;
+        ds->attr_tuner_state.attr.store = dock_switch_tuner_state_store;
+        sysfs_attr_init(&ds->attr_tuner_state.attr.attr);
+        device_create_file((&ds->sdev)->dev, &ds->attr_tuner_state.attr);
+
+        ds->ldoa2_reg = 0;
+        ds->ldoa6_reg = 0;
+        ds->ldoa17_reg = 0;
+        ds->ldoa22_reg = 0;
+        ds->ldoa23_reg = 0;
+        snprintf(ds->attr_cam_ldos_state.name, sizeof(ds->attr_cam_ldos_state.name) - 1, "cam_ldos_en");
+        ds->attr_cam_ldos_state.attr.attr.name = ds->attr_cam_ldos_state.name;
+        ds->attr_cam_ldos_state.attr.attr.mode = S_IRUGO|S_IWUGO;
+        ds->attr_cam_ldos_state.attr.show = dock_switch_cam_ldos_state_show;
+        ds->attr_cam_ldos_state.attr.store = dock_switch_cam_ldos_state_store;
+        sysfs_attr_init(&ds->attr_cam_ldos_state.attr.attr);
+        device_create_file((&ds->sdev)->dev, &ds->attr_cam_ldos_state.attr);
+        //en_all_cam_ldos(ds, 1);
 
         /////////////////////////////////////////////////////////////////////////////////////////////
 

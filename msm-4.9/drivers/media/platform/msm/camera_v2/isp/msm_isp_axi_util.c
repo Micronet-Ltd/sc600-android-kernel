@@ -1569,6 +1569,7 @@ static void msm_isp_axi_stream_enable_cfg(
 	for (k = 0; k < stream_info->num_isp; k++) {
 		vfe_dev = stream_info->vfe_dev[k];
 		axi_data = &vfe_dev->axi_data;
+        pr_notice("WM[%d], max_width[%u]\n", enable_wm, (unsigned int)stream_info->max_width[k]);
 		for (i = 0; i < stream_info->num_planes; i++) {
 			vfe_dev->hw_info->vfe_ops.axi_ops.enable_wm(
 				vfe_dev->vfe_base,

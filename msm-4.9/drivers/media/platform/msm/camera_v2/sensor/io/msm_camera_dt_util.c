@@ -1556,7 +1556,7 @@ int msm_camera_power_up(struct msm_camera_power_ctrl_t *ctrl,
 			goto power_up_failed;
 		}
 	}
-	CDBG("%s exit\n", __func__);
+	pr_notice("%s succeed\n", __func__);
 	return 0;
 power_up_failed:
 	pr_err_ratelimited("%s:%d failed\n", __func__, __LINE__);

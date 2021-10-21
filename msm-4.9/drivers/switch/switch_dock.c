@@ -906,8 +906,8 @@ static void dock_switch_work_func_fix(struct work_struct *work)
             }
         }
         power_supply_set_property(ds->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
-        prop.intval = 1500*1000;
-        power_supply_set_property(ds->usb_psy, POWER_SUPPLY_PROP_SDP_CURRENT_MAX, &prop);
+//        prop.intval = 1500*1000;
+//        power_supply_set_property(ds->usb_psy, POWER_SUPPLY_PROP_SDP_CURRENT_MAX, &prop);
     }
     mutex_unlock(&ds->lock);
 

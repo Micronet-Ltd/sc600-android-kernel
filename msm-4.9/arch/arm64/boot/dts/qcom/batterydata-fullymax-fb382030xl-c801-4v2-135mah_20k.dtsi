@@ -14,22 +14,22 @@ qcom,c801_fullymax_fb382030xl_4v2_135mah_20k {
 	/* #batterydata-fullymax-fb382030xl-c801-4v2-135mah_20k_PMI632_averaged_MasterSlave_Apr26th2021*/
 	qcom,max-voltage-uv = <4200000>;
 	qcom,fg-cc-cv-threshold-uv = <4190000>;
-	qcom,fastchg-current-ma = <130>;
+	qcom,fastchg-current-ma = <180>;
 	qcom,batt-id-kohm = <14>;
 	qcom,battery-beta = <3435>;
 	qcom,battery-therm-kohm = <10>;
 	qcom,battery-type = "c801_fullymax_fb382030xl_4v2_135mah_20k";
 	qcom,qg-batt-profile-ver = <100>;
 
-	qcom,jeita-fcc-ranges = <0   100  90000
-				101  400  130000
-				401  450  100000>;
+	qcom,jeita-fcc-ranges = <0   100  100000
+				101  400  180000
+				401  450  120000>;
 	qcom,jeita-fv-ranges = <0   100  4195000
 				101 400  4200000
 				401 450  4198000>;
-	qcom,step-chg-ranges = <3600000  4190000  130000
-				4191000  4195000  70000
-				4196000  4200000  50000>;
+	qcom,step-chg-ranges = <3600000  4190000  180000
+				4191000  4195000  90000
+				4196000  4200000  60000>;
 
 	/* COOL = 0 DegC, WARM = 45 DegC */
 	qcom,jeita-soft-thresholds = <0x3730 0x0FB0>;

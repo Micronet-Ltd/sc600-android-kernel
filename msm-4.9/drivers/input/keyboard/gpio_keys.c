@@ -660,7 +660,7 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 
 	pdata->rep = !!of_get_property(node, "autorepeat", NULL);
 
-	of_property_read_string(node, "label", &pdata->name);
+	of_property_read_string(node, "input-name", &pdata->name);
 
 	i = 0;
 	for_each_available_child_of_node(node, pp) {
@@ -770,7 +770,7 @@ static int gpio_keys_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, ddata);
 	input_set_drvdata(input, ddata);
 
-	input->name = pdata->name ? : pdev->name;
+	input->name = pdata->name ? pdev->name: GPIO_KEYS_DEV_NAME;
 	input->phys = "gpio-keys/input0";
 	input->dev.parent = &pdev->dev;
 	input->open = gpio_keys_open;

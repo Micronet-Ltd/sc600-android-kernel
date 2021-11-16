@@ -4356,8 +4356,25 @@ static int dwc3_msm_gadget_vbus_draw(struct dwc3_msm *mdwc, unsigned int mA)
 		return 0;
 
 	/* Set max current limit in uA */
-    if (mdwc->vbus_active && mA < 100) {
-        mA = 900;
+    if (mdwc->vbus_active && mA < 900) {
+        int rc = 0;
+        union power_supply_propval pval = {0, };
+        struct power_supply	*ext_psy;
+
+        pval.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+        ext_psy = power_supply_get_by_name("pc_port");
+        if (ext_psy) {
+            rc = power_supply_get_property(ext_psy, POWER_SUPPLY_PROP_SCOPE, &pval);
+            if (POWER_SUPPLY_SCOPE_DEVICE != pval.intval) {
+                pval.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+            }
+        }
+
+        if (POWER_SUPPLY_SCOPE_DEVICE == pval.intval) {
+            mA = 900;
+        } else {
+            mA = 500;
+        }
     }
     dev_notice(mdwc->dev, "draw from USB = %u\n", mA);
     pval.intval = 1000 * mA; 

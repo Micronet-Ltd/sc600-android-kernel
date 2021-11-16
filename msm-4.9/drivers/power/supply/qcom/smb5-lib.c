@@ -2139,8 +2139,11 @@ static int smblib_get_prop_ufp_mode(struct smb_charger *chg)
 	smblib_dbg(chg, PR_REGISTER, "TYPE_C_STATUS_1 = 0x%02x\n", stat);
 
 	switch (stat & DETECTED_SRC_TYPE_MASK) {
-	case SNK_RP_STD_BIT:
-		return POWER_SUPPLY_TYPEC_SOURCE_DEFAULT;
+    case SNK_RP_STD_BIT:
+        if (chg->pwr_brd_supply) {
+            return POWER_SUPPLY_TYPEC_SOURCE_MEDIUM;
+        }
+        return POWER_SUPPLY_TYPEC_SOURCE_DEFAULT; 
 	case SNK_RP_1P5_BIT:
 		return POWER_SUPPLY_TYPEC_SOURCE_MEDIUM;
 	case SNK_RP_3P0_BIT:

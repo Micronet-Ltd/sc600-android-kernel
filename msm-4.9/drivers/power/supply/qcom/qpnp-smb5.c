@@ -676,7 +676,7 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 
 		if (((chg->typec_mode == POWER_SUPPLY_TYPEC_SOURCE_DEFAULT) ||
 		   (chg->connector_type == POWER_SUPPLY_CONNECTOR_MICRO_USB))
-			&& (chg->real_charger_type == POWER_SUPPLY_TYPE_USB))
+			&& (chg->real_charger_type == POWER_SUPPLY_TYPE_USB) && !chg->pwr_brd_supply)
 			val->intval = 0;
 		else
 			val->intval = 1;

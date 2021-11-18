@@ -674,9 +674,11 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 		if (!val->intval)
 			break;
 
+        //pr_notice("typ-c mode[%d], connector [%d], charger type[%d], powered by %s\n",
+        //          chg->typec_mode, chg->connector_type, chg->real_charger_type, chg->pwr_brd_supply?"net939":"type-c supplier");
 		if (((chg->typec_mode == POWER_SUPPLY_TYPEC_SOURCE_DEFAULT) ||
 		   (chg->connector_type == POWER_SUPPLY_CONNECTOR_MICRO_USB))
-			&& (chg->real_charger_type == POWER_SUPPLY_TYPE_USB))
+			&& (chg->real_charger_type == POWER_SUPPLY_TYPE_USB) && !chg->pwr_brd_supply)
 			val->intval = 0;
 		else
 			val->intval = 1;
@@ -962,8 +964,6 @@ static int smb5_usb_port_get_prop(struct power_supply *psy,
 	return 0;
 }
 
-//void smblib_handle_apsd_done(struct smb_charger *chg, bool rising);
-void typec_src_removal(struct smb_charger *chg);
 static int smb5_usb_port_set_prop(struct power_supply *psy,
 		enum power_supply_property psp,
 		const union power_supply_propval *val)
@@ -978,17 +978,10 @@ static int smb5_usb_port_set_prop(struct power_supply *psy,
             int prev = chg->otg_en;
             chg->otg_en = val->intval;
             if (chg->otg_en == POWER_SUPPLY_SCOPE_DEVICE) {
-/*
-                chg->sink_src_mode = SINK_MODE;
-                smblib_handle_apsd_done(chg, 1);
-                rc = smblib_configure_hvdcp_apsd(chg, 1);
-                smblib_rerun_apsd_if_required(chg);
-                vote(chg->usb_icl_votable, DCP_VOTER, chg->dcp_icl_ua != -EINVAL, chg->dcp_icl_ua);
-                pr_notice("%s: sinking power\n", __func__);
-*/
+                pr_notice("Power board attached\n");
+                chg->pwr_brd_supply = 1;
             } else if (prev == POWER_SUPPLY_SCOPE_DEVICE) {
-                typec_src_removal(chg);
-                chg->sink_src_mode = UNATTACHED_MODE;
+                pr_notice("Power board detached\n");
                 chg->pwr_brd_supply = 0;
             } else {
                 vote(chg->awake_votable, OTG_DELAY_VOTER, 1, 0); 
@@ -2883,7 +2876,7 @@ static int smb5_show_charger_status(struct smb5 *chip)
 	}
 	batt_charge_type = val.intval;
 
-	pr_info("SMB5 status - usb:present=%d type=%d batt:present = %d health = %d charge = %d\n",
+	pr_notice("SMB5 status - usb:present=%d type=%d batt:present = %d health = %d charge = %d\n",
 		usb_present, chg->real_charger_type,
 		batt_present, batt_health, batt_charge_type);
 	return rc;

@@ -284,7 +284,6 @@ static int qpnp_typec_configure_ssmux(struct qpnp_typec_chip *chip,
 			break;
 		case CC_1:
 		case CC_2:
-		pr_debug("[oem][typec]:%s: %p %d %d\n", __func__,chip->ss_mux_vreg, chip->ssmux_gpio,chip->gpio_flag);
 			if (chip->ss_mux_vreg) {
 				rc = regulator_enable(chip->ss_mux_vreg);
 				if (rc) {

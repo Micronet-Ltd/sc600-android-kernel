@@ -674,6 +674,8 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 		if (!val->intval)
 			break;
 
+        //pr_notice("typ-c mode[%d], connector [%d], charger type[%d], powered by %s\n",
+        //          chg->typec_mode, chg->connector_type, chg->real_charger_type, chg->pwr_brd_supply?"net939":"type-c supplier");
 		if (((chg->typec_mode == POWER_SUPPLY_TYPEC_SOURCE_DEFAULT) ||
 		   (chg->connector_type == POWER_SUPPLY_CONNECTOR_MICRO_USB))
 			&& (chg->real_charger_type == POWER_SUPPLY_TYPE_USB) && !chg->pwr_brd_supply)
@@ -976,7 +978,10 @@ static int smb5_usb_port_set_prop(struct power_supply *psy,
             int prev = chg->otg_en;
             chg->otg_en = val->intval;
             if (chg->otg_en == POWER_SUPPLY_SCOPE_DEVICE) {
+                pr_notice("Power board attached\n");
+                chg->pwr_brd_supply = 1;
             } else if (prev == POWER_SUPPLY_SCOPE_DEVICE) {
+                pr_notice("Power board detached\n");
                 chg->pwr_brd_supply = 0;
             } else {
                 vote(chg->awake_votable, OTG_DELAY_VOTER, 1, 0); 
@@ -2871,7 +2876,7 @@ static int smb5_show_charger_status(struct smb5 *chip)
 	}
 	batt_charge_type = val.intval;
 
-	pr_info("SMB5 status - usb:present=%d type=%d batt:present = %d health = %d charge = %d\n",
+	pr_notice("SMB5 status - usb:present=%d type=%d batt:present = %d health = %d charge = %d\n",
 		usb_present, chg->real_charger_type,
 		batt_present, batt_health, batt_charge_type);
 	return rc;

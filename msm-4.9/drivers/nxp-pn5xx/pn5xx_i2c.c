@@ -56,7 +56,7 @@
 #define CONFIG_OF
 #endif
 
-#define DEBUG_NFC_RUN 1
+//#define DEBUG_NFC_RUN 1
 
 #ifdef DEBUG_NFC_RUN
 #define DEBUG_NFC(x...)   pr_err(x)

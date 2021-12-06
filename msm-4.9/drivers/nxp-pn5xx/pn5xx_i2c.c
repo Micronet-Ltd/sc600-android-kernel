@@ -250,9 +250,9 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
 
 		while (1) {
             spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags);
-            enable_irq(pn54x_dev->client->irq);
             pn54x_dev->irq_enabled = true;
             spin_unlock_irqrestore(&pn54x_dev->irq_enabled_lock, flags);
+            enable_irq(pn54x_dev->client->irq);
 			ret = wait_event_interruptible(
 					pn54x_dev->read_wq,
 					!pn54x_dev->irq_enabled);
@@ -698,8 +698,8 @@ static int pn54x_probe(struct i2c_client *client,
 	}
     spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags);
     pn54x_dev->irq_enabled = true;
-    pn54x_disable_irq(pn54x_dev);
     spin_unlock_irqrestore(&pn54x_dev->irq_enabled_lock, flags);
+    pn54x_disable_irq(pn54x_dev);
 
 	i2c_set_clientdata(client, pn54x_dev);
 	

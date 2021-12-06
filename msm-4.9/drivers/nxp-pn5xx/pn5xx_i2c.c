@@ -168,7 +168,6 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
         DEBUG_NFC("%s: %d dev->ven_gpio %d set 1\n", __func__, __LINE__,dev->ven_gpio);
 		msleep(20);
 		hk_ret = gpio_get_value(dev->ven_gpio);
-		pr_err("hk 11 hk_ret = %d\n", hk_ret);
 		if (gpio_is_valid(dev->firm_gpio)) {
 			gpio_set_value(dev->firm_gpio, 1);
             DEBUG_NFC("%s: %d dev->ven_firm_gpio %d set 1\n", __func__, __LINE__,dev->firm_gpio);
@@ -181,19 +180,17 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 		gpio_set_value(dev->ven_gpio, 0);
 		hk_ret = gpio_get_value(dev->ven_gpio);
 
-		pr_err("hk 22 hk_ret = %d\n", hk_ret);
 		msleep(100);
 		gpio_set_value(dev->ven_gpio, 1);
 		msleep(20);
 		hk_ret = gpio_get_value(dev->ven_gpio);
-		pr_notice("hk 33 hk_ret = %d\n", hk_ret);
 	}
 	else {
 		pr_err("%s bad arg %d\n", __func__, mode);
 		return -EINVAL;
 	}
 
-	pr_notice("hk pn544_enable end \n");
+	pr_notice("pn544 enabled\n");
 	
 	return 0;
 	
@@ -250,50 +247,54 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
 		}
 
 		while (1) {
-            DEBUG_NFC("%s while(1) pn54x\n", __func__);
-			pn54x_dev->irq_enabled = true;
-			enable_irq(pn54x_dev->client->irq);
+            spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags);
+            enable_irq(pn54x_dev->client->irq);
+            pn54x_dev->irq_enabled = true;
+            spin_unlock_irqrestore(&pn54x_dev->irq_enabled_lock, flags);
 			ret = wait_event_interruptible(
 					pn54x_dev->read_wq,
 					!pn54x_dev->irq_enabled);
 
-			pn54x_disable_irq(pn54x_dev);
+			//pn54x_disable_irq(pn54x_dev);
 			if (ret) {
                 DEBUG_NFC("%s  pn54x  goto fail\n", __func__);
                 goto fail;
             }
 				
-			if (gpio_get_value(pn54x_dev->irq_gpio))
+			if (gpio_get_value(pn54x_dev->irq_gpio)) {
+                /* Read data */
+                ret = i2c_master_recv(pn54x_dev->client, tmp, count);
+
+                mutex_unlock(&pn54x_dev->read_mutex);
+
+                /* pn54x seems to be slow in handling I2C read requests
+                 * so add 1ms delay after recv operation */
+                mdelay(10);
+
+                if (ret < 0) {
+                    pr_err("%s: i2c bus failure %d\n", __func__, ret);
+                    return ret;
+                }
+                if (ret > count) {
+                    pr_err("%s: too large i2c data (%d), restrict it\n", __func__, ret);
+                    ret = count;
+                }
+                if (copy_to_user(buf, tmp, ret)) {
+                    pr_err("%s : failed copy to user space\n", __func__);
+                    return -EFAULT;
+                }
 				break;
+            }
 
-			pr_err("%s: spurious interrupt detected\n", __func__);
+			pr_notice("%s: spurious interrupt, wait for next\n", __func__);
 		}
-	}
 
-	/* Read data */
-	ret = i2c_master_recv(pn54x_dev->client, tmp, count);
-
-	mutex_unlock(&pn54x_dev->read_mutex);
-
-	/* pn54x seems to be slow in handling I2C read requests
-	 * so add 1ms delay after recv operation */
-	udelay(1000);
-
-	if (ret < 0) {
-		pr_err("%s: pn54x i2c_master_recv returned %d\n", __func__, ret);
-		return ret;
-	}
-	if (ret > count) {
-		pr_err("%s: pn54x received too many bytes from i2c (%d)\n",
-			__func__, ret);
-		return -EIO;
-	}
-	if (copy_to_user(buf, tmp, ret)) {
-		pr_err("%s : pn54x failed to copy to user space\n", __func__);
-		return -EFAULT;
-	}
-    DEBUG_NFC("%s : pn54x copy to user space OK %d bytes \n", __func__,ret);
-	return ret;
+        pr_notice("%s : return to user space %d bytes \n", __func__, ret);
+        return ret;
+	} else {
+        pr_notice("%s: spurious interrupt, nothing to return\n", __func__);
+        ret = -EIO;
+    }
 
 fail:
 	mutex_unlock(&pn54x_dev->read_mutex);
@@ -325,7 +326,7 @@ static ssize_t pn54x_dev_write(struct file *filp, const char __user *buf,
 
 	/* pn54x seems to be slow in handling I2C write requests
 	 * so add 1ms delay after I2C send oparation */
-	udelay(1000);
+    mdelay(10);
 
 	return ret;
 }
@@ -361,23 +362,19 @@ static long  pn54x_dev_ioctl(struct file *filp, unsigned int cmd,
 				unsigned long arg)
 {
 	struct pn54x_dev *pn54x_dev = filp->private_data;
-	pr_err("hk %s, cmd=0x%08x, PN544_SET_PWR=0x%08x\n", __func__, cmd, (unsigned int)PN544_SET_PWR);
-	pr_err("hk %s, cmd=%d, arg=%lu\n", __func__, cmd, arg);
+	pr_notice("hk %s, cmd=0x%08x, PN544_SET_PWR=0x%08x\n", __func__, cmd, (unsigned int)PN544_SET_PWR);
+	pr_notice("hk %s, cmd=%d, arg=%lu\n", __func__, cmd, arg);
 	switch (cmd) {
 	case PN544_SET_PWR:
-		pr_err("hk 1111\n");
 		if (arg == 2) {
-			pr_err("hk %s PN544_SET_PWR\n", __func__);
 			/* power on w/FW */
 			if (GPIO_UNUSED == pn544_enable(pn54x_dev, arg)) {
 				return GPIO_UNUSED;
 			}
 		} else if (arg == 1) {
-			pr_err("hk %s 4444\n", __func__);
 			/* power on */
 			pn544_enable(pn54x_dev, arg);
 		} else  if (arg == 0) {
-			pr_err("hk 5555\n");
 			/* power off */
 			pn544_disable(pn54x_dev);
 		} else {
@@ -386,24 +383,20 @@ static long  pn54x_dev_ioctl(struct file *filp, unsigned int cmd,
 		}
 		break;
 	case PN54X_CLK_REQ:
-		pr_err("hk %s PN54X_CLK_REQ arg arg 2222\n", __func__);
+		pr_notice("hk %s PN54X_CLK_REQ arg arg 2222\n", __func__);
 		if(1 == arg){
-			pr_err("hk 666\n");
 			if(gpio_is_valid(pn54x_dev->clkreq_gpio)){
 				gpio_set_value(pn54x_dev->clkreq_gpio, 1);
                 DEBUG_NFC("%s: %d pn54x_dev->clkreq_gpio %dset 1\n", __func__, __LINE__,pn54x_dev->clkreq_gpio);
-			}
-			else {
+			} else {
 				pr_err("%s Unused Clkreq GPIO %lu\n", __func__, arg);
 				return GPIO_UNUSED;
 			}
-		}
-		else if(0 == arg) {
+		} else if (0 == arg) {
 			if(gpio_is_valid(pn54x_dev->clkreq_gpio)){
 				gpio_set_value(pn54x_dev->clkreq_gpio, 0);
                 DEBUG_NFC("%s: %d pn54x_dev->clkreq_gpio %dset 0\n", __func__, __LINE__,pn54x_dev->clkreq_gpio);
-			}
-			else {
+			} else {
 				pr_err("%s Unused Clkreq GPIO %lu\n", __func__, arg);
 				return GPIO_UNUSED;
 			}
@@ -416,7 +409,7 @@ static long  pn54x_dev_ioctl(struct file *filp, unsigned int cmd,
 		pr_err("%s bad ioctl %u\n", __func__, cmd);
 		return -EINVAL;
 	}
-	pr_err("%s: SUCCESS return 0\n", __func__);
+	pr_notice("%s: SUCCESS return 0\n", __func__);
 	return 0;
 }
 
@@ -506,26 +499,26 @@ static int pn54x_get_pdata(struct device *dev,
 	 */
 	pdata->pvdd_reg = regulator_get(dev, "nxp,pn54x-pvdd");
 	if(IS_ERR(pdata->pvdd_reg)) {
-		pr_err("%s: could not get nxp,pn54x-pvdd, rc=%ld\n", __func__, PTR_ERR(pdata->pvdd_reg));
+		pr_notice("%s: could not get nxp,pn54x-pvdd, rc=%ld\n", __func__, PTR_ERR(pdata->pvdd_reg));
 		pdata->pvdd_reg = NULL;
 	}
 
 	pdata->vbat_reg = regulator_get(dev, "nxp-vbat");
 	if (IS_ERR(pdata->vbat_reg)) {
-		pr_err("%s: could not get nxp,pn54x-vbat, rc=%ld\n", __func__, PTR_ERR(pdata->vbat_reg));
+		pr_notice("%s: could not get nxp,pn54x-vbat, rc=%ld\n", __func__, PTR_ERR(pdata->vbat_reg));
 		pdata->vbat_reg = NULL;
 	}
 	
 
 	pdata->pmuvcc_reg = regulator_get(dev, "nxp,pn54x-pmuvcc");
 	if (IS_ERR(pdata->pmuvcc_reg)) {
-		pr_err("%s: could not get nxp,pn54x-pmuvcc, rc=%ld\n", __func__, PTR_ERR(pdata->pmuvcc_reg));
+		pr_notice("%s: could not get nxp,pn54x-pmuvcc, rc=%ld\n", __func__, PTR_ERR(pdata->pmuvcc_reg));
 		pdata->pmuvcc_reg = NULL;
 	}
 
 	pdata->sevdd_reg = regulator_get(dev, "nxp,pn54x-sevdd");
 	if (IS_ERR(pdata->sevdd_reg)) {
-		pr_err("%s: could not get nxp,pn54x-sevdd, rc=%ld\n", __func__, PTR_ERR(pdata->sevdd_reg));
+		pr_notice("%s: could not get nxp,pn54x-sevdd, rc=%ld\n", __func__, PTR_ERR(pdata->sevdd_reg));
 		pdata->sevdd_reg = NULL;
 	}
 
@@ -695,14 +688,16 @@ static int pn54x_probe(struct i2c_client *client,
 	 * for reading.  it is cleared when all data has been read.
 	 */
 	pr_info("%s : requesting IRQ %d\n", __func__, client->irq);
-	pn54x_dev->irq_enabled = true;
 	ret = request_irq(client->irq, pn54x_dev_irq_handler,
 				IRQF_TRIGGER_HIGH, client->name, pn54x_dev);
 	if (ret) {
 		dev_err(&client->dev, "request_irq failed\n");
 		goto err_request_irq_failed;
 	}
-	pn54x_disable_irq(pn54x_dev);
+    spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags);
+    pn54x_dev->irq_enabled = true;
+    pn54x_disable_irq(pn54x_dev);
+    spin_unlock_irqrestore(&pn54x_dev->irq_enabled_lock, flags);
 
 	i2c_set_clientdata(client, pn54x_dev);
 	

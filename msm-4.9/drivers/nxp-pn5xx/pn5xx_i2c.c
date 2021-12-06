@@ -232,6 +232,8 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
 	struct pn54x_dev *pn54x_dev = filp->private_data;
 	char tmp[MAX_BUFFER_SIZE];
 	int ret;
+    unsigned long flags;
+
     DEBUG_NFC("%s: %d \n", __func__, __LINE__);
 	if (count > MAX_BUFFER_SIZE)
 		count = MAX_BUFFER_SIZE;
@@ -316,8 +318,8 @@ static ssize_t pn54x_dev_write(struct file *filp, const char __user *buf,
 		pr_err("%s : failed to copy from user space\n", __func__);
 		return -EFAULT;
 	}
-    DEBUG_NFC("%s : writing %zu bytes.\n", __func__, count);
-	/* Write data */
+
+    /* Write data */
 	ret = i2c_master_send(pn54x_dev->client, tmp, count);
 	if (ret != count) {
 		pr_err("%s : i2c_master_send returned %d\n", __func__, ret);
@@ -545,7 +547,7 @@ static int pn54x_probe(struct i2c_client *client,
 #endif
 {
 	int ret;
-	//int i =  0;
+    unsigned long flags;
 	struct pn544_i2c_platform_data *pdata; // gpio values, from board file or DT
 	struct pn544_i2c_platform_data tmp_pdata;
 	struct pn54x_dev *pn54x_dev; // internal device specific data

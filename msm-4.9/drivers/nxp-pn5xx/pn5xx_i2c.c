@@ -277,7 +277,7 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
 
     /* pn54x seems to be slow in handling I2C read requests
      * so add 1ms delay after recv operation */
-    udelay(1000);
+    mdelay(10);
 
     if (ret < 0) {
         pr_err("%s: i2c bus failure %d\n", __func__, ret);
@@ -325,7 +325,7 @@ static ssize_t pn54x_dev_write(struct file *filp, const char __user *buf,
 
 	/* pn54x seems to be slow in handling I2C write requests
 	 * so add 1ms delay after I2C send oparation */
-	udelay(1000);
+	mdelay(10);
 
 	return ret;
 }

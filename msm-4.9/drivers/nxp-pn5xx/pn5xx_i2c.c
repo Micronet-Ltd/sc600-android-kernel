@@ -264,39 +264,36 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
             }
 				
 			if (gpio_get_value(pn54x_dev->irq_gpio)) {
-                /* Read data */
-                ret = i2c_master_recv(pn54x_dev->client, tmp, count);
-
-                mutex_unlock(&pn54x_dev->read_mutex);
-
-                /* pn54x seems to be slow in handling I2C read requests
-                 * so add 1ms delay after recv operation */
-                udelay(1000);
-
-                if (ret < 0) {
-                    pr_err("%s: i2c bus failure %d\n", __func__, ret);
-                    return ret;
-                }
-                if (ret > count) {
-                    pr_err("%s: too large i2c data (%d), restrict it\n", __func__, ret);
-                    ret = count;
-                }
-                if (copy_to_user(buf, tmp, ret)) {
-                    pr_err("%s : failed copy to user space\n", __func__);
-                    return -EFAULT;
-                }
 				break;
             }
 
 			pr_notice("%s: spurious interrupt, wait for next\n", __func__);
 		}
+	}
+    /* Read data */
+    ret = i2c_master_recv(pn54x_dev->client, tmp, count);
 
-        pr_notice("%s : return to user space %d bytes \n", __func__, ret);
+    mutex_unlock(&pn54x_dev->read_mutex);
+
+    /* pn54x seems to be slow in handling I2C read requests
+     * so add 1ms delay after recv operation */
+    udelay(1000);
+
+    if (ret < 0) {
+        pr_err("%s: i2c bus failure %d\n", __func__, ret);
         return ret;
-	} else {
-        pr_notice("%s: spurious interrupt, nothing to return\n", __func__);
-        ret = -EIO;
     }
+    if (ret > count) {
+        pr_err("%s: too large i2c data (%d), restrict it\n", __func__, ret);
+        ret = count;
+    }
+    if (copy_to_user(buf, tmp, ret)) {
+        pr_err("%s : failed copy to user space\n", __func__);
+        return -EFAULT;
+    }
+
+    pr_notice("%s: return to user space %d bytes \n", __func__, ret);
+    return ret;
 
 fail:
 	mutex_unlock(&pn54x_dev->read_mutex);

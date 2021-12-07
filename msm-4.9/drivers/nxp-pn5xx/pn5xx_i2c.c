@@ -293,7 +293,7 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
         return -EFAULT;
     }
 
-    pr_notice("%s: return to user space %d bytes \n", __func__, ret);
+    pr_debug("%s: return to user space %d bytes \n", __func__, ret);
     return ret;
 
 fail:

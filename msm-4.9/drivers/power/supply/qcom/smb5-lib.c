@@ -2186,7 +2186,7 @@ static int smblib_get_prop_dfp_mode(struct smb_charger *chg)
 	return POWER_SUPPLY_TYPEC_NONE;
 }
 
-static int smblib_get_prop_typec_mode(struct smb_charger *chg)
+int smblib_get_prop_typec_mode(struct smb_charger *chg)
 {
 	int rc;
 	u8 stat;
@@ -3347,7 +3347,8 @@ static void update_sw_icl_max(struct smb_charger *chg, int pst)
 
 	/* TypeC rp med or high, use rp value */
 	typec_mode = smblib_get_prop_typec_mode(chg);
-	if (typec_rp_med_high(chg, typec_mode)) {
+	if (typec_rp_med_high(chg, typec_mode) || chg->pwr_brd_supply) {
+        smblib_dbg(chg, PR_MISC, "override ICL to max\n");
 		rp_ua = get_rp_based_dcp_current(chg, typec_mode);
 		vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true, rp_ua);
 		return;
@@ -3626,7 +3627,7 @@ static void typec_src_removal(struct smb_charger *chg)
 	chg->typec_legacy = false;
 }
 
-static void smblib_handle_rp_change(struct smb_charger *chg, int typec_mode)
+void smblib_handle_rp_change(struct smb_charger *chg, int typec_mode)
 {
 	const struct apsd_result *apsd = smblib_get_apsd_result(chg);
 

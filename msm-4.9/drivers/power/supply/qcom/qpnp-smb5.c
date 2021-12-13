@@ -929,7 +929,7 @@ static int smb5_usb_port_get_prop(struct power_supply *psy,
 		break;
     case POWER_SUPPLY_PROP_ONLINE:
         rc = smblib_get_prop_usb_online(chg, val); 
-		if (!val->intval && !chg->pwr_brd_supply)
+		if (!val->intval)
 			break;
 
         if (chg->otg_en == POWER_SUPPLY_SCOPE_DEVICE)
@@ -964,12 +964,15 @@ static int smb5_usb_port_get_prop(struct power_supply *psy,
 	return 0;
 }
 
+int smblib_get_prop_typec_mode(struct smb_charger *chg);
+void smblib_handle_rp_change(struct smb_charger *chg, int typec_mode);
 static int smb5_usb_port_set_prop(struct power_supply *psy,
 		enum power_supply_property psp,
 		const union power_supply_propval *val)
 {
     struct smb5 *chip = power_supply_get_drvdata(psy);
     struct smb_charger *chg = &chip->chg;
+    int typec_mode;
 	int rc = 0;
 
 	switch (psp) {
@@ -987,6 +990,14 @@ static int smb5_usb_port_set_prop(struct power_supply *psy,
                 vote(chg->awake_votable, OTG_DELAY_VOTER, 1, 0); 
                 pr_notice("Scheduling power board connection\n");
                 schedule_delayed_work(&chg->uusb_otg_work, msecs_to_jiffies(chg->otg_delay_ms));
+            }
+            if (chg->otg_en != POWER_SUPPLY_SCOPE_SYSTEM) {
+                typec_mode = smblib_get_prop_typec_mode(chg); 
+                if (chg->sink_src_mode != UNATTACHED_MODE && (typec_mode != chg->typec_mode)) {
+                    smblib_handle_rp_change(chg, typec_mode);
+                }
+                chg->typec_mode = typec_mode;
+                power_supply_changed(chg->usb_psy);
             }
             power_supply_changed(chg->usb_port_psy);
         }

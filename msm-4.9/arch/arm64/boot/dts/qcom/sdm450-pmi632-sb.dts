@@ -13,7 +13,7 @@
 
 /dts-v1/;
 
-#include "sdm450.dtsi"
+#include "sdm450-sb.dtsi"
 #include "sdm450-pmi632.dtsi"
 #include "msm8953-pmi632-panel-camera.dtsi"
 

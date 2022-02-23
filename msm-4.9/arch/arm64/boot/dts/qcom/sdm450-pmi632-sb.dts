@@ -32,8 +32,7 @@
 
 &soc {
 	virtual_leds {
-		compatible = "virtual-leds-fixed";
-		status = "okay";
+		status = "disabled";
 	};
 
 	virtual_j1708 {

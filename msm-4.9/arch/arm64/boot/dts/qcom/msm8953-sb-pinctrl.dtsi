@@ -1572,55 +1572,6 @@
 			};
 		};
 
-		/* add pingrp for touchscreen */
-		ts_int_default: ts_int_default {
-			mux {
-				pins = "gpio65";
-				function = "gpio";
-			};
-			config {
-				pins = "gpio65";
-				drive-strength = <16>;
-				/*bias-pull-up;*/
-				input-enable;
-				bias-disable;
-			};
-		};
-
-		ts_int_output_high: ts_int_output_high {
-			mux {
-				pins = "gpio65";
-				function = "gpio";
-			};
-			config {
-				pins = "gpio65";
-				output-high;
-			};
-		};
-
-		ts_int_output_low: ts_int_output_low {
-			mux {
-				pins = "gpio65";
-				function = "gpio";
-			};
-			config {
-				pins = "gpio65";
-				output-low;
-			};
-		};
-
-		ts_int_input: ts_int_input {
-			mux {
-				pins = "gpio65";
-				function = "gpio";
-			};
-			config {
-				pins = "gpio65";
-				input-enable;
-				bias-disable;
-			};
-		};
-
 		ts_rst_default: ts_rst_default {
 			mux {
 				pins = "gpio64";
@@ -1670,36 +1621,6 @@
 		};
 
 		/* add pingrp for touchscreen */
-		pmx_ts_int_active {
-			ts_int_active: ts_int_active {
-				mux {
-					pins = "gpio65";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio65";
-					drive-strength = <8>;
-					bias-pull-up;
-				};
-			};
-		};
-
-		pmx_ts_int_suspend {
-			ts_int_suspend: ts_int_suspend {
-				mux {
-					pins = "gpio65";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio65";
-					drive-strength = <2>;
-					bias-pull-down;
-				};
-			};
-		};
-
 		pmx_ts_reset_active {
 			ts_reset_active: ts_reset_active {
 				mux {
@@ -1724,21 +1645,6 @@
 
 				config {
 					pins = "gpio64";
-					drive-strength = <2>;
-					bias-pull-down;
-				};
-			};
-		};
-
-		pmx_ts_release {
-			ts_release: ts_release {
-				mux {
-					pins = "gpio65", "gpio64";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio65", "gpio64";
 					drive-strength = <2>;
 					bias-pull-down;
 				};
@@ -2196,7 +2102,34 @@
 				};
 			};
 		};
-/* cradle connectivety */
+
+		automotive_inputs {
+			automotive_inputs_active: automotive_inputs_active {
+				mux {
+					pins = "gpio36", "gpio65";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio36", "gpio65";
+					drive-strength = <2>;
+					bias-disable;
+				};
+			};
+
+			automotive_inputs_suspend: automotive_inputs_suspend {
+				mux {
+					pins = "gpio36", "gpio65";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio36", "gpio65";
+					drive-strength = <2>;
+					bias-disable;
+				};
+			};
+		};
 		watchdog_pin {
 			watchdog_pin_active: watchdog_pin_active {
 				mux {

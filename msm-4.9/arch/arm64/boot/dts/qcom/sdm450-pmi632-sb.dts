@@ -36,7 +36,19 @@
 	};
 
 	virtual_j1708 {
-		compatible = "virtual-j1708";
+		status = "disabled";
+	};
+
+	fixed-vinputs {
+		compatible = "mcn,tlmm-based-vinputs";
+		pinctrl-names = "automotive_inputs_active", "automotive_inputs_suspend";
+		pinctrl-0 = <&automotive_inputs_active>;
+		pinctrl-1 = <&automotive_inputs_suspend>;
+		mcn,ain-0 = <&tlmm 36 GPIO_ACTIVE_LOW>;
+		mcn,ain-1 = <&tlmm 65 GPIO_ACTIVE_HIGH>;
+		interrupt-parent = <&tlmm>;
+		interrupt-names = "ain-0", "ain-1";
+		interrupts = <&tlmm 36 IRQ_TYPE_EDGE_BOTH>, <&tlmm 65 IRQ_TYPE_EDGE_BOTH>;
 		status = "okay";
 	};
 
@@ -49,7 +61,7 @@
 		mcn,rf-kill-pin = <&tlmm 99 0>;
 		mcn,high-delay=<1000>;
 		mcn,low-delay=<1000>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	dock {
@@ -71,7 +83,7 @@
 		interrupt-names = "cradle-detect";
 		interrupt-parent = <&tlmm>;
 		interrupts = <&tlmm 21 0>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	hi3w {
@@ -109,11 +121,6 @@
 		interrupt-names = "pwr-loss";
 		interrupt-parent = <&tlmm>;
 		interrupts = <&tlmm 98 0>;
-		status = "okay";
-	};
-
-	fixed-vinputs {
-		compatible = "mcn,fixed-vinputs";
 		status = "okay";
 	};
 

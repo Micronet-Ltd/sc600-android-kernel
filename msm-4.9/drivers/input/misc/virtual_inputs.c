@@ -65,7 +65,7 @@ struct virt_inputs {
     struct  delayed_work    virtual_input_init_work;
     struct  notifier_block  virtual_inputs_cradle_notifier;
 	struct 	work_params     wparams; 
-	struct 	vinput_key*     vmap;
+	struct 	vinput_key      *vmap;
 	struct	gpio_set 	    gpios_in;
 	struct 	notifier_block  notifier;
 	int		                reinit;
@@ -456,9 +456,15 @@ static int __init virtual_inputs_init(void)
     np = of_find_compatible_node(NULL, NULL, "mcn,fixed-vinputs");
     if (np) {
         fixed_mode = 1;
-        pr_err("node is finded\n");
+        pr_notice("vinputs are stm32/k20 based\n");
+    } else {
+        np = of_find_compatible_node(NULL, NULL, "mcn,tlmm-based-vinputs");
+        if (np) {
+            pr_notice("vinputs are tlmm based\n");
+            return 0;
+        }
     }
-	pr_info("%s:+\n", __func__);
+	pr_info("%s:\n", __func__);
 	vdev = kzalloc(sizeof(struct virt_inputs), GFP_KERNEL);
 	if (!vdev)
 		return -ENOMEM;

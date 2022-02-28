@@ -2062,6 +2062,7 @@ static const struct dev_pm_ops dock_switch_pm_ops = {
 static struct of_device_id dock_switch_match[] = {
 	{ .compatible = "mcn,dock-switch", },
     { .compatible = "mcn,fixed-dock-switch", },
+//    { .compatible = "mcn,tlmm-based-vinputs", },
 	{},
 };
 

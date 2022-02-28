@@ -45,7 +45,7 @@
 		pinctrl-0 = <&automotive_inputs_active>;
 		pinctrl-1 = <&automotive_inputs_suspend>;
 		mcn,ain-0 = <&tlmm 36 GPIO_ACTIVE_LOW>;
-		mcn,ain-1 = <&tlmm 65 GPIO_ACTIVE_HIGH>;
+		mcn,ain-1 = <&tlmm 65 GPIO_ACTIVE_LOW>;
 		interrupt-parent = <&tlmm>;
 		interrupt-names = "ain-0", "ain-1";
 		interrupts = <&tlmm 36 IRQ_TYPE_EDGE_BOTH>, <&tlmm 65 IRQ_TYPE_EDGE_BOTH>;

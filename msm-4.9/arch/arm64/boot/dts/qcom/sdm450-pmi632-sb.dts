@@ -61,7 +61,7 @@
 		mcn,rf-kill-pin = <&tlmm 99 0>;
 		mcn,high-delay=<1000>;
 		mcn,low-delay=<1000>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	dock {

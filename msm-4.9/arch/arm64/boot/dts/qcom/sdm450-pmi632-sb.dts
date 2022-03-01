@@ -53,14 +53,11 @@
 	};
 
 	watchdogpin {
-		compatible = "mcn,fixed-watchdog-pin";
+		compatible = "mcn,pwr-button-timer-fb";
 		pinctrl-names = "watchdog_pin_active", "watchdog_pin_suspend";
 		pinctrl-0 = <&watchdog_pin_active>;		
 		pinctrl-1 = <&watchdog_pin_suspend>;
-		mcn,toggle-pin = <&tlmm 36 0>;
-		mcn,rf-kill-pin = <&tlmm 99 0>;
-		mcn,high-delay=<1000>;
-		mcn,low-delay=<1000>;
+		mcn,toggle-pin = <&tlmm 64 0>;
 		status = "okay";
 	};
 

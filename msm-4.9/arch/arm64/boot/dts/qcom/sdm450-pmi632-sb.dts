@@ -62,7 +62,7 @@
 	};
 
 	dock {
-		compatible = "mcn,fixed-dock-switch";
+		compatible = "mcn,sb-dock-switch";
 		pinctrl-names = "dock_pins_active", "dock_pin_suspend";
 		pinctrl-0 = <&dock_pins_active>;
 		pinctrl-1 = <&dock_pin_suspend>;

@@ -249,6 +249,18 @@
 				qcom,fast-avg-setup = <0>;
 				qcom,cal-val = <0>;
 			};
+
+			chan@13 {
+				label = "ignition_v";
+				reg = <0x13>;
+				qcom,decimation = <2>;
+				qcom,pre-div-channel-scaling = <4>;
+				qcom,calibration-type = "absolute";
+				qcom,scale-function = <0>;
+				qcom,hw-settle-time = <0>;
+				qcom,fast-avg-setup = <0>;
+				qcom,cal-val = <0>;
+			};
 		};
 
 		pmi632_adc_tm: vadc@3500 {

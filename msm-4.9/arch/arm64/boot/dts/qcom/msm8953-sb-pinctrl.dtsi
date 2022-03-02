@@ -1928,19 +1928,6 @@
 				bias-disable;
 			};
 		};
-/*jeffery add for usb otg id 2019.2.14*/
-		oem_otg_vreg_active: oem_otg_vreg_active {
-			mux {
-				pins = "gpio97";
-				function = "gpio";
-			};
-
-			config {
-				pins = "gpio97";
-				drive-strength = <8>;
-				bias-pull-up;
-			};
-		};
 		
 		usbid_detect_config_default: usbid_detect_config_default {
 			mux {	
@@ -1971,12 +1958,12 @@
 		pwr_led {
 			pwr_led_active: pwr_led_active {
 				mux {
-					pins = "gpio97";
+					pins = "gpio13";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio97";
+					pins = "gpio13";
 					drive-strength = <6>;
 					bias-pull-down;
 				};
@@ -1984,12 +1971,12 @@
 
 			pwr_led_suspend: pwr_led_suspend {
 				mux {
-					pins = "gpio97";
+					pins = "gpio13";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio97";
+					pins = "gpio13";
 					drive-strength = <6>;
 					bias-disable;
 				};
@@ -2082,39 +2069,39 @@
 		dock {
 			dock_pins_active: dock_pins_active {
 				mux {
-					pins = "gpio18", "gpio21", "gpio19";
+					pins = "gpio97";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio18", "gpio21", "gpio19";
+					pins = "gpio97";
 					drive-strength = <2>;
-					bias-pull-down;
+					bias-disable;
 				};
 			};
 
 			dock_pin_suspend: dock_pin_suspend {
 				mux {
-					pins = "gpio18", "gpio21", "gpio19";
+					pins = "gpio97";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio18", "gpio21", "gpio19";
+					pins = "gpio97";
 					drive-strength = <2>;
-					bias-pull-down;
+					bias-disable;
 				};
 			};
 		};
 		hi_3w {
 			hi_3w_pins_active: hi_3w_pins_active {
 				mux {
-					pins = "gpio89", "gpio13", "gpio2";
+					pins = "gpio89", "gpio2";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio89", "gpio13", "gpio2";
+					pins = "gpio89", "gpio2";
 					drive-strength = <6>;
 					bias-pull-up;
 				};
@@ -2122,12 +2109,12 @@
 
 			hi_3w_pin_suspend: hi_3w_pin_suspend {
 				mux {
-					pins = "gpio89", "gpio13", "gpio2";
+					pins = "gpio89", "gpio2";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio89", "gpio13", "gpio2";
+					pins = "gpio89", "gpio2";
 					drive-strength = <2>;
 					bias-pull-down;
 				};

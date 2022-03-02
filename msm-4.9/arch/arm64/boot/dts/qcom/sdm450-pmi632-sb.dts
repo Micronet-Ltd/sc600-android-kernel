@@ -67,20 +67,16 @@
 		pinctrl-0 = <&dock_pins_active>;
 		pinctrl-1 = <&dock_pin_suspend>;
 		mcn,dock-pin = <&tlmm 21 GPIO_ACTIVE_LOW>;
-		/* usb switch hw controlled by vbus_cradle signal */
-		mcn,usb-switch-pin = <&tlmm 18 GPIO_ACTIVE_HIGH>;
-		/*mcn,otg-en-pin = <&tlmm 97 GPIO_ACTIVE_HIGH>;*/
-		mcn,mic-switch-pin = <&tlmm 19 GPIO_ACTIVE_HIGH>;
+		interrupt-names = "ignition-changed";
+		interrupt-parent = <&tlmm>;
+		interrupts = <&tlmm 21 0>;
 		tuner-supply = <&pm8953_l10>;
 		ldoa2-supply = <&pm8953_l2>;
 		ldoa6-supply = <&pm8953_l6>;
 		ldoa17-supply = <&pm8953_l17>;
 		ldoa22-supply = <&pm8953_l22>;
 		ldoa23-supply = <&pm8953_l23>;
-		interrupt-names = "cradle-detect";
-		interrupt-parent = <&tlmm>;
-		interrupts = <&tlmm 21 0>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	hi3w {

@@ -66,6 +66,8 @@
 		pinctrl-names = "dock_pins_active", "dock_pin_suspend";
 		pinctrl-0 = <&dock_pins_active>;
 		pinctrl-1 = <&dock_pin_suspend>;
+		mcn,aout-0 = <&tlmm 131 GPIO_ACTIVE_HIGH>;
+		mcn,aout-1 = <&tlmm 19 GPIO_ACTIVE_HIGH>;
 		mcn,dock-pin = <&tlmm 97 GPIO_ACTIVE_HIGH>;
 		interrupt-names = "ignition-changed";
 		interrupt-parent = <&tlmm>;
@@ -76,17 +78,6 @@
 		ldoa17-supply = <&pm8953_l17>;
 		ldoa22-supply = <&pm8953_l22>;
 		ldoa23-supply = <&pm8953_l23>;
-		status = "okay";
-	};
-
-	hi3w {
-		compatible = "mcn,hi-3w";
-		pinctrl-names = "default", "sleep";
-		pinctrl-0 = <&hi_3w_pins_active>;
-		pinctrl-1 = <&hi_3w_pin_suspend>;
-		mcn,3w-clock-pin = <&tlmm 13 GPIO_ACTIVE_LOW>;
-		mcn,3w-miso-pin = <&tlmm 89 GPIO_ACTIVE_LOW>;
-		mcn,3w-mosi-pin = <&tlmm 2 GPIO_ACTIVE_LOW>;
 		status = "okay";
 	};
 
@@ -129,6 +120,10 @@
 };
 
 &blsp1_serial1 {
+	status = "disabled";
+};
+
+&blsp2_uart0_gs {
 	status = "disabled";
 };
 

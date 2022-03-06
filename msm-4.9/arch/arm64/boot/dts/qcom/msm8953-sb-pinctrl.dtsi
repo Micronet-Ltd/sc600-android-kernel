@@ -313,12 +313,12 @@
 		cam_sensor_front_default: cam_sensor_front_default {
 			/* RESET, STANDBY */
 			mux {
-				pins = "gpio131","gpio132";
+				pins = "gpio132";
 				function = "gpio";
 			};
 
 			config {
-				pins = "gpio131","gpio132";
+				pins = "gpio132";
 				bias-disable; /* No PULL */
 				drive-strength = <2>; /* 2 MA */
 			};
@@ -327,12 +327,12 @@
 		cam_sensor_front_sleep: cam_sensor_front_sleep {
 			/* RESET, STANDBY */
 			mux {
-				pins = "gpio131","gpio132";
+				pins = "gpio132";
 				function = "gpio";
 			};
 
 			config {
-				pins = "gpio131","gpio132";
+				pins = "gpio132";
 				bias-disable; /* No PULL */
 				drive-strength = <2>; /* 2 MA */
 			};
@@ -2070,12 +2070,12 @@
 		dock {
 			dock_pins_active: dock_pins_active {
 				mux {
-					pins = "gpio97";
+					pins = "gpio97", "gpio131", "gpio19";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio97";
+					pins = "gpio97", "gpio131", "gpio19";
 					drive-strength = <2>;
 					bias-disable;
 				};
@@ -2083,41 +2083,14 @@
 
 			dock_pin_suspend: dock_pin_suspend {
 				mux {
-					pins = "gpio97";
+					pins = "gpio97", "gpio131", "gpio19";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio97";
+					pins = "gpio97", "gpio131", "gpio19";
 					drive-strength = <2>;
 					bias-disable;
-				};
-			};
-		};
-		hi_3w {
-			hi_3w_pins_active: hi_3w_pins_active {
-				mux {
-					pins = "gpio89", "gpio2";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio89", "gpio2";
-					drive-strength = <6>;
-					bias-pull-up;
-				};
-			};
-
-			hi_3w_pin_suspend: hi_3w_pin_suspend {
-				mux {
-					pins = "gpio89", "gpio2";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio89", "gpio2";
-					drive-strength = <2>;
-					bias-pull-down;
 				};
 			};
 		};

@@ -1156,15 +1156,6 @@ static ssize_t dock_switch_outs_mask_state_show(struct device *dev, struct devic
     struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
     struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
 
-#if 0
-    spin_lock_irqsave(&inf->rfkillpin_lock, inf->lock_flags);
-    if (kstrtos32(buf, 10, &val))
-    spin_unlock_irqrestore(&inf->rfkillpin_lock, inf->lock_flags);
-#endif
-//    pr_notice("already initialized %d..%d\n", ds->outs_base, ds->outs_base + ds->outs_num - 1);
-//    ds->outs_base = ds->outs_num = -1;
-//    schedule_delayed_work(&ds->vgpio_init_work, msecs_to_jiffies(1000));
-
     return sprintf(buf, "%x\n", ds->outs_mask_state); 
 }
 
@@ -1501,8 +1492,6 @@ static int gpc_lable_match(struct gpio_chip *gpc, void *lbl)
 	return !strcmp(gpc->label, lbl);
 }
 
-////////////////////////////////////////////////////////////////////////////////////////
-
 static void mcu_gpio_init_work(struct work_struct *work)
 {
     struct dock_switch_device *ds = container_of(work, struct dock_switch_device, mcu_gpio_init_work.work);
@@ -1556,20 +1545,15 @@ static void mcu_gpio_init_work(struct work_struct *work)
 
     schedule_delayed_work(&ds->mcu_gpio_init_work, msecs_to_jiffies(1000));
 }
-///////////////////////////////////////////////////////////////////////////////////////////////
 
 static void swithc_dock_outs_init_work(struct work_struct *work)
 {
     struct dock_switch_device *ds = container_of(work, struct dock_switch_device, vgpio_init_work.work);
     static int secs = 60;
     int err = -1, i = 0;
-//    int fd;
-//    char gpiochip_dir[32];
     char gp_file[64];
-//    mm_segment_t prev_fs;
     struct gpio_chip *gpc;
 
-#if 1
     if ((-1 != ds->outs_num && -1 != ds->outs_base) || (secs <= 0)) {
         secs = 60;
         return;
@@ -1578,7 +1562,7 @@ static void swithc_dock_outs_init_work(struct work_struct *work)
     gpc = gpiochip_find("vgpio_out", gpc_lable_match);
 
     if (gpc) {
-        ds->outs_base = gpc->base;
+        ds->outs_base = 0;
         ds->outs_num  = gpc->ngpio;
         ds->outs_can_sleep  = gpc->can_sleep;
         for (i = 0; i < ds->outs_num; i++) {
@@ -1597,70 +1581,6 @@ static void swithc_dock_outs_init_work(struct work_struct *work)
         pr_notice("%s %d..%d\n", gpc->label, ds->outs_base, ds->outs_base + ds->outs_num - 1);
         return;
     }
-
-#else
-    if ((-1 != ds->outs_num && -1 != ds->outs_base) || (secs <= 0)) {
-        secs = 60;
-        return;
-    }
-
-    secs--;
-    err = find_dir_by_label("/sys/class/gpio/", "vgpio_out", gpiochip_dir, (sizeof(gpiochip_dir) - sizeof(gpiochip_dir[0])) / sizeof(gpiochip_dir[0])); 
-
-    if (0 == err) {
-        prev_fs = get_fs();
-        set_fs(get_ds());
-        sprintf(gp_file, "/sys/class/gpio/%s/base", gpiochip_dir);
-        fd = sys_open(gp_file, O_RDONLY, S_IRUSR|S_IRGRP);
-        if (fd) {
-            err = sys_read(fd, gp_file, 8); 
-            sys_close(fd);
-            if (err > 0) {
-                err--;
-                if (err > 7) {
-                    err = 7;
-                }
-                gp_file[err] = 0; 
-                ds->outs_base = simple_strtoul(gp_file, 0, 10);
-            }
-        }
-        sprintf(gp_file, "/sys/class/gpio/%s/ngpio", gpiochip_dir);
-        fd = sys_open(gp_file, O_RDONLY, S_IRUSR|S_IRGRP);
-        if (fd) {
-            err = sys_read(fd, gp_file, 8); 
-            sys_close(fd);
-            if (err > 0) {
-                err--;
-                if (err > 7) {
-                    err = 7;
-                }
-                gp_file[err] = 0; 
-                ds->outs_num = simple_strtoul(gp_file, 0, 10);
-                if (ds->outs_num > VGPIO_MAX) {
-                    ds->outs_num = VGPIO_MAX;
-                }
-            }
-        }
-
-        pr_notice("%s %d..%d\n", gpiochip_dir, ds->outs_base, ds->outs_base + ds->outs_num - 1);
-
-        set_fs(prev_fs);
-
-        for (i = 0; i < ds->outs_num; i++) {
-            if (gpio_is_valid(ds->outs_base + i)) {
-                sprintf(gp_file, "virtual_out_%d", i);
-                err = devm_gpio_request(ds->pdev, ds->outs_base + i, gp_file);
-                if (err) {
-                    pr_err("virtual out [%d] is busy!\n", ds->outs_base + i);
-                } else {
-                    ds->outs_pins[i] = ds->outs_base + i;
-                    gpio_direction_output(ds->outs_pins[i], 0);
-                    gpio_export(ds->outs_pins[i], 0);
-                }
-            }
-        }
-    }
-#endif
 
     schedule_delayed_work(&ds->vgpio_init_work, msecs_to_jiffies(1000));
 }
@@ -1987,31 +1907,69 @@ static int dock_switch_probe(struct platform_device *pdev)
         device_create_file((&ds->sdev)->dev, &ds->attr_cam_ldos_state.attr);
         //en_all_cam_ldos(ds, 1);
 
-        /////////////////////////////////////////////////////////////////////////////////////////////
+        if (DOCK_SWITCH_SB != compatible) {
+            snprintf(ds->attr_J1708_en.name, sizeof(ds->attr_J1708_en.name) - 1, "J1708_en");
+            ds->attr_J1708_en.attr.attr.name  = ds->attr_J1708_en.name;
+            ds->attr_J1708_en.attr.attr.mode = S_IRUGO|S_IWUGO;//666
+            ds->attr_J1708_en.attr.show = j1708_en_state_show;
+            ds->attr_J1708_en.attr.store = j1708_en_state_store;
+            sysfs_attr_init(&ds->attr_J1708_en.attr.attr);
+            device_create_file((&ds->sdev)->dev, &ds->attr_J1708_en.attr);
 
-        snprintf(ds->attr_J1708_en.name, sizeof(ds->attr_J1708_en.name) - 1, "J1708_en");
-        ds->attr_J1708_en.attr.attr.name  = ds->attr_J1708_en.name;
-        ds->attr_J1708_en.attr.attr.mode = S_IRUGO|S_IWUGO;//666
-        ds->attr_J1708_en.attr.show = j1708_en_state_show;
-        ds->attr_J1708_en.attr.store = j1708_en_state_store;
-        sysfs_attr_init(&ds->attr_J1708_en.attr.attr);
-        device_create_file((&ds->sdev)->dev, &ds->attr_J1708_en.attr);
+            snprintf(ds->attr_rs485_en.name, sizeof(ds->attr_rs485_en.name) - 1, "rs485_en");
+            ds->attr_rs485_en.attr.attr.name = ds->attr_rs485_en.name;
+            ds->attr_rs485_en.attr.attr.mode = S_IRUGO|S_IWUGO;//666
+            ds->attr_rs485_en.attr.show = rs485_en_state_show;
+            ds->attr_rs485_en.attr.store = rs485_en_state_store;
+            sysfs_attr_init(&ds->attr_rs485_en.attr.attr);
+            device_create_file((&ds->sdev)->dev, &ds->attr_rs485_en.attr);
 
-        snprintf(ds->attr_rs485_en.name, sizeof(ds->attr_rs485_en.name) - 1, "rs485_en");
-        ds->attr_rs485_en.attr.attr.name = ds->attr_rs485_en.name;
-        ds->attr_rs485_en.attr.attr.mode = S_IRUGO|S_IWUGO;//666
-        ds->attr_rs485_en.attr.show = rs485_en_state_show;
-        ds->attr_rs485_en.attr.store = rs485_en_state_store;
-        sysfs_attr_init(&ds->attr_rs485_en.attr.attr);
-        device_create_file((&ds->sdev)->dev, &ds->attr_rs485_en.attr);
+            INIT_DELAYED_WORK(&ds->mcu_gpio_init_work, mcu_gpio_init_work);
+            schedule_delayed_work(&ds->mcu_gpio_init_work, msecs_to_jiffies(100));
 
-        INIT_DELAYED_WORK(&ds->mcu_gpio_init_work, mcu_gpio_init_work);
-        schedule_delayed_work(&ds->mcu_gpio_init_work, msecs_to_jiffies(100));
+            INIT_DELAYED_WORK(&ds->vgpio_init_work, swithc_dock_outs_init_work);
+            schedule_delayed_work(&ds->vgpio_init_work, msecs_to_jiffies(100));
+        } else {
+            int i = 0;
+            ds->outs_base = 0;
+            ds->outs_num  = 0;
+            ds->outs_can_sleep  = 0;
+            ds->outs_pins[i] = of_get_named_gpio_flags(np,"mcn,aout-0", 0, (enum of_gpio_flags *)&ds->otg_en_l);
+            if (gpio_is_valid(ds->outs_pins[i])) {
+                ds->otg_en_l = !ds->otg_en_l;
+                err = devm_gpio_request(dev, ds->outs_pins[i], "aout-0");
+                if (err) {
+                    dev_err(dev, "aout[%d] busy\n", ds->outs_pins[i]);
+                    ds->outs_pins[i] = -1;
+                } else {
+                    ds->outs_can_sleep = gpio_cansleep(ds->outs_pins[i]);
+                    gpio_direction_output(ds->outs_pins[i], ds->otg_en_l);
+                    gpio_export(ds->outs_pins[i], 0);
+                    ds->outs_num++;
+                    i++;
+                }
+            } else {
+                ds->outs_pins[i] = -1;
+            }
 
-        ////////////////////////////////////////////////////
-
-        INIT_DELAYED_WORK(&ds->vgpio_init_work, swithc_dock_outs_init_work);
-        schedule_delayed_work(&ds->vgpio_init_work, msecs_to_jiffies(100));
+            ds->outs_pins[i] = of_get_named_gpio_flags(np,"mcn,aout-1", 0, (enum of_gpio_flags *)&ds->otg_en_l);
+            if (gpio_is_valid(ds->outs_pins[i])) {
+                ds->otg_en_l = !ds->otg_en_l;
+                err = devm_gpio_request(dev, ds->outs_pins[i], "aout-1");
+                if (err) {
+                    dev_err(dev, "aout[%d] busy\n", ds->outs_pins[i]);
+                    ds->outs_pins[i] = -1;
+                } else {
+                    ds->outs_can_sleep = gpio_cansleep(ds->outs_pins[i]);
+                    gpio_direction_output(ds->outs_pins[i], ds->otg_en_l);
+                    gpio_export(ds->outs_pins[i], 0);
+                    ds->outs_num++;
+                    i++;
+                }
+            } else {
+                ds->outs_pins[i] = -1;
+            }
+        }
 
         return 0;
     } while (0);

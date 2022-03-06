@@ -2066,6 +2066,7 @@
 				};
 			};
 		};
+
 		dock {
 			dock_pins_active: dock_pins_active {
 				mux {

@@ -66,10 +66,10 @@
 		pinctrl-names = "dock_pins_active", "dock_pin_suspend";
 		pinctrl-0 = <&dock_pins_active>;
 		pinctrl-1 = <&dock_pin_suspend>;
-		mcn,dock-pin = <&tlmm 21 GPIO_ACTIVE_LOW>;
+		mcn,dock-pin = <&tlmm 97 GPIO_ACTIVE_HIGH>;
 		interrupt-names = "ignition-changed";
 		interrupt-parent = <&tlmm>;
-		interrupts = <&tlmm 21 0>;
+		interrupts = <&tlmm 97 0>;
 		tuner-supply = <&pm8953_l10>;
 		ldoa2-supply = <&pm8953_l2>;
 		ldoa6-supply = <&pm8953_l6>;

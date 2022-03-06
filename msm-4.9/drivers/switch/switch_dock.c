@@ -960,6 +960,59 @@ debounced:
 	}
 }
 
+static void dock_switch_work_func_sb(struct work_struct *work)
+{
+	struct dock_switch_device *ds  = container_of(work, struct dock_switch_device, work);
+    int val = 0;
+    uint32_t fd;
+    char ver[16];
+
+    mutex_lock(&ds->lock);
+    if (ds->dock_active_l == gpio_get_value(ds->dock_pin)) {
+        pr_notice("ignition on %lld\n", ktime_to_ms(ktime_get()));
+        val = (SWITCH_DOCK | SWITCH_IGN | SWITCH_ODOCK);
+    } else {
+        val = SWITCH_DOCK | SWITCH_ODOCK;
+        ds->dock_type = e_dock_type_basic;
+        pr_notice("ignition off %lld\n", ktime_to_ms(ktime_get()));
+    }
+    mutex_unlock(&ds->lock);
+
+    if (ds->sched_irq & SWITCH_IGN) {
+        pr_notice("enable ign/dock monitor irq[%d]\n", ds->dock_irq);
+        ds->sched_irq &= ~SWITCH_IGN;
+        enable_switch_irq(ds->dock_irq, 1);
+    }
+
+    ds->sched_irq &= ~SWITCH_DOCK;
+
+    if (ds->state != val) {
+        pr_notice("dock state changed to %d\n", val);
+        fd = sys_open("/proc/mcu_version", O_WRONLY, 0);
+        if (fd >= 0) {
+            sprintf(ver, "net888.v2");
+            sys_write(fd, ver, strlen(ver));
+            sys_close(fd);
+        }
+
+        if (val & SWITCH_IGN) {
+            __pm_stay_awake(&ds->wlock.ws);
+        } else {
+            __pm_relax(&ds->wlock.ws);
+        }
+		ds->state = val;
+		switch_set_state(&ds->sdev, val);
+
+        if (val & SWITCH_ODOCK) {
+            val = 0x11;
+        } else {
+            val = 0;
+        }
+
+        cradle_notify(val, 0);
+	}
+}
+
 static irqreturn_t dock_switch_irq_handler(int irq, void *arg)
 {
 	struct dock_switch_device *ds = (struct dock_switch_device *)arg;
@@ -968,7 +1021,7 @@ static irqreturn_t dock_switch_irq_handler(int irq, void *arg)
     int sched = 0;
 
 // Vladimir
-// the pins IGN and CRADLE_DETECT ara swapped in hardware
+// the pins IGN and CRADLE_DETECT ara swapped in a9 hardware
 //
 
     irq_desc = irq_to_desc(irq);
@@ -1616,6 +1669,7 @@ static void swithc_dock_outs_init_work(struct work_struct *work)
 // Portable and fix tab8 otehrwize smart cam that alwys fix
 //
 #define DOCK_SWITCH_PORTABLE 1
+#define DOCK_SWITCH_SB       2
 
 static int dock_switch_probe(struct platform_device *pdev)
 {
@@ -1638,10 +1692,14 @@ static int dock_switch_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
     c = of_get_property(np, "compatible", NULL);
-    if (c && 0 == strncmp("mcn,fixed-dock-switch", c, sizeof("mcn,fixed-dock-switch") - sizeof(char))) {
-        compatible = !DOCK_SWITCH_PORTABLE;
+    if (c) {
+        if (0 == strncmp("mcn,sb-dock-switch", c, sizeof("mcn,sb-dock-switch") - sizeof(char))) {
+            compatible = DOCK_SWITCH_SB;
+        } else if (0 == strncmp("mcn,fixed-dock-switch", c, sizeof("mcn,fixed-dock-switch") - sizeof(char))) {
+            compatible = !DOCK_SWITCH_PORTABLE; 
+        }
     }
-    pr_notice("TAB8 %s \n", (DOCK_SWITCH_PORTABLE == compatible)?"portable":"fixed");
+    dev_notice(dev, "%s: %s \n", (DOCK_SWITCH_SB == compatible)?"Single board net888":"TAB8 based", (DOCK_SWITCH_PORTABLE == compatible)?"portable":"fixed");
 
     ds->state = 0;
     do {
@@ -1832,16 +1890,21 @@ static int dock_switch_probe(struct platform_device *pdev)
                 }
             }
 
-			INIT_WORK(&ds->work, dock_switch_work_func_fix);
+            if (DOCK_SWITCH_SB == compatible) {
+                INIT_WORK(&ds->work, dock_switch_work_func_sb);
+            } else {
+                INIT_WORK(&ds->work, dock_switch_work_func_fix);
 
-			ds->ignition_notifier.notifier_call = dock_switch_ign_callback;
-			err = gpio_in_register_notifier(&ds->ignition_notifier);
-			if (err) {
-				pr_err("failure to register remount notifier [%d]\n", err);
-				err = -EINVAL;
-				break;
-			}
+                ds->ignition_notifier.notifier_call = dock_switch_ign_callback;
+                err = gpio_in_register_notifier(&ds->ignition_notifier);
+                if (err) {
+                    pr_err("failure to register vin notifier [%d]\n", err);
+                    err = -EINVAL;
+                    break;
+                }
+            }
 		}
+
         ds->sdev.name = "dock";
         ds->sdev.print_state = dock_switch_print_state;
         err = switch_dev_register(&ds->sdev);
@@ -1849,10 +1912,13 @@ static int dock_switch_probe(struct platform_device *pdev)
             pr_err("err_register_switch\n");
             break;
         }
-    	err = device_create_file((&ds->sdev)->dev, &dev_attr_ampl_enable);
-    	if (err < 0) {
-            pr_err("err0r create amplifier file\n");
-            break;
+
+        if (DOCK_SWITCH_SB != compatible) {
+        	err = device_create_file((&ds->sdev)->dev, &dev_attr_ampl_enable);
+        	if (err < 0) {
+                pr_err("err0r create amplifier file\n");
+                break;
+            }
         }
 
         spin_lock_init(&ds->outs_mask_lock);
@@ -2062,7 +2128,7 @@ static const struct dev_pm_ops dock_switch_pm_ops = {
 static struct of_device_id dock_switch_match[] = {
 	{ .compatible = "mcn,dock-switch", },
     { .compatible = "mcn,fixed-dock-switch", },
-    { .compatible = "mcn,tlmm-based-vinputs", },
+    { .compatible = "mcn,sb-dock-switch", },
 	{},
 };
 

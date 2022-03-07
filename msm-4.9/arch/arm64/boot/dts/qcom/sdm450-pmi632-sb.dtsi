@@ -121,42 +121,42 @@
 		};
 		blue-1 {
 			gpios = <&tlmm 99 0x0>;
-			label = "blue";
+			label = "blue-1";
 			linux,default-trigger = "none";
 			default-state = "off";
 			retain-state-suspended;
 		};
 		green-1 {
 			gpios = <&tlmm 98 0x0>;
-			label = "green";
+			label = "green-1";
 			linux,default-trigger = "none";
 			default-state = "off";
 			retain-state-suspended;
 		};
 		red-1 {
 			gpios = <&tlmm 3 0x0>;
-			label = "red";
+			label = "red-1";
 			linux,default-trigger = "none";
 			default-state = "off";
 			retain-state-suspended;
 		};
 		blue-2 {
 			gpios = <&tlmm 1 0x0>;
-			label = "blue";
+			label = "blue-2";
 			linux,default-trigger = "none";
 			default-state = "off";
 			retain-state-suspended;
 		};
 		green-2 {
 			gpios = <&tlmm 2 0x0>;
-			label = "green";
+			label = "green-2";
 			linux,default-trigger = "none";
 			default-state = "off";
 			retain-state-suspended;
 		};
 		red-2 {
 			gpios = <&tlmm 0 0x0>;
-			label = "red";
+			label = "red-2";
 			linux,default-trigger = "none";
 			default-state = "off";
 			retain-state-suspended;

@@ -346,7 +346,7 @@
 		pinctrl-names = "pwr_led_active", "pwr_led_suspend";
 		pinctrl-0 = <&pwr_led_active>;
 		pinctrl-1 = <&pwr_led_suspend>;
-		mcn,pwr-led = <&tlmm 97 GPIO_ACTIVE_HIGH>;
+		mcn,pwr-led = <&tlmm 13 GPIO_ACTIVE_HIGH>;
 	};
 
 	qcom,mpm2-sleep-counter@4a3000 {

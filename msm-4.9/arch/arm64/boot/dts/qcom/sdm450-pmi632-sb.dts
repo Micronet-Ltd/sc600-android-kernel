@@ -14,7 +14,7 @@
 /dts-v1/;
 
 #include "sdm450-sb.dtsi"
-#include "sdm450-pmi632.dtsi"
+#include "sdm450-pmi632-sb.dtsi"
 #include "msm8953-pmi632-panel-camera.dtsi"
 
 / {
@@ -98,7 +98,7 @@
 		pinctrl-names = "pwr_loss_mon_active", "pwr_loss_mon_suspend";
 		pinctrl-0 = <&pwr_loss_mon_active>;
 		pinctrl-1 = <&pwr_loss_mon_suspend>;
-		mcn,pwr-loss-mon = <&tlmm 98 GPIO_ACTIVE_LOW>;
+		mcn,pwr-loss-mon = <&tlmm 18 GPIO_ACTIVE_LOW>;
 		mcn,wan-off-delay = <0>;
 		mcn,wlan-off-delay = <0>;
 		mcn,plat-off-delay = <180000>;
@@ -106,6 +106,7 @@
 		interrupt-names = "pwr-loss";
 		interrupt-parent = <&tlmm>;
 		interrupts = <&tlmm 98 0>;
+		qcom,mpp2_adc-vadc = <&pm8953_vadc>;
 		status = "okay";
 	};
 
@@ -125,6 +126,14 @@
 };
 
 &blsp2_uart0_gs {
+	status = "disabled";
+};
+
+&i2c_1  {
+	status = "disabled";
+};
+
+&i2c_5  {
 	status = "disabled";
 };
 

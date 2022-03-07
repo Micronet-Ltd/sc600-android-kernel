@@ -32,6 +32,7 @@
 //#include <linux/cred.h>
 #include <linux/dirent.h>
 //#include <linux/string.h>
+#include <linux/qpnp/qpnp-adc.h>
 #include "../misc/hi_3w/hi_3w.h"
 
 #if defined  (CONFIG_PRODUCT_TAB8_FIXED)
@@ -120,10 +121,9 @@ struct dock_switch_device {
     struct  dock_switch_attr attr_dbg_state;
     struct  dock_switch_attr attr_tuner_state;
     struct  dock_switch_attr attr_cam_ldos_state;
-    //////////////barak/////////////////////
     struct  dock_switch_attr attr_J1708_en;
     struct  dock_switch_attr attr_rs485_en;
-    ////////////////////////////////////////   
+    struct  dock_switch_attr attr_ign_v;
     spinlock_t outs_mask_lock;
     unsigned long lock_flags;
     unsigned outs_mask_state;
@@ -1080,77 +1080,6 @@ static int32_t __ref dock_switch_ign_callback(struct notifier_block *nfb, unsign
     return NOTIFY_OK;
 }
 
-#if 0
-//unsigned long long de_buf[(sizeof(struct linux_dirent64) + 260)/sizeof(unsigned long long)];
-static int find_dir_by_label(char *root, char *label, char *out, int out_len)
-{
-	struct linux_dirent64 *de;
-	int fd,lfd, des, err = -1, i;
-    mm_segment_t prev_fs;
-    char de_buf[sizeof(struct linux_dirent64) + 260];
-    char lfname[64], lbl[64];
-
-    prev_fs = get_fs();
-	set_fs(get_ds());
-
-    fd = sys_open(root, O_DIRECTORY|O_RDONLY, S_IRUSR|S_IRGRP);
-    if (fd) {
-        do {
-            de = (struct linux_dirent64 *)de_buf;
-            des = sys_getdents64(fd, de, sizeof(de_buf)); 
-            if (des < 0) {
-                pr_notice("failure to read %s entry [%lx, %lu]%d\n", root, (unsigned long)de_buf, sizeof(de_buf), des);
-                err = -1;
-            } else if (0 == des) {
-                //pr_notice("last entry\n");
-                err = 0;
-            } else {
-                i = 0;
-                do {
-                    de = (struct linux_dirent64 *)&de_buf[i];
-                    if (DT_DIR == de->d_type || DT_LNK == de->d_type) {
-                        err = 0;
-                        //pr_notice("found %s entry [%d, %d, %d]\n", de->d_name, de->d_reclen, de->d_type, des);
-                        sprintf(lfname, "%s%s/label", root, de->d_name);
-                        lfd = sys_open(lfname, O_RDONLY, S_IRUSR|S_IRGRP);
-                        if (lfd) {
-                            err = sys_read(lfd, lbl, sizeof(lbl) - 1);
-                            sys_close(lfd);
-                            if (err > 0) {
-                                err--;
-                                if (err >= sizeof(lbl)) {
-                                    err = sizeof(lbl) - 1;
-                                }
-                                if (err > out_len) {
-                                    err = out_len - 1;
-                                }
-                                lbl[err] = 0; 
-                                //pr_notice("is %s [%s] match to %s\n", lfname, lbl, label);
-                                if (0 == strncmp(lbl, label, out_len)) {
-                                    des = 0;
-                                    err = 0;
-                                    //pr_notice("found\n");
-                                    strncpy(out, de->d_name, out_len);
-                                    break;
-                                }
-                            }
-                        }
-                    } else {
-                        //pr_notice("%s entry [%d, %d, %d] isn't directory\n", de->d_name, de->d_reclen, de->d_type, des);
-                    }
-                    i += de->d_reclen;
-                } while (i < des);
-            }
-        } while (des > 0);
-        sys_close(fd);
-    }
-
-    set_fs(prev_fs);
-
-    return err;
-}
-#endif
-
 static ssize_t dock_switch_outs_mask_state_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
@@ -1485,6 +1414,28 @@ static ssize_t dock_switch_cam_ldos_state_store(struct device *dev, struct devic
     }
 
     return count; 
+}
+
+static ssize_t dock_switch_ign_v_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
+    struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
+    struct qpnp_vadc_chip *vadc;
+    struct qpnp_vadc_result vadc_res;
+    int vol = 0;
+
+	vadc = qpnp_get_vadc(ds->pdev,"ignition_v");
+	if(!vadc) {
+		return sprintf(buf, "vadc for ignition_v channel not available\n");
+    }
+
+	if(qpnp_vadc_read(vadc, 0x13, &vadc_res)){
+        return sprintf(buf, "failure to retrieve vadc ignition_v channel\n");
+	}
+	vol = vadc_res.physical/1000;
+	vol *= 22;
+
+	return snprintf(buf, 10, "%d mV\n", vol);
 }
 
 static int gpc_lable_match(struct gpio_chip *gpc, void *lbl)
@@ -1931,6 +1882,15 @@ static int dock_switch_probe(struct platform_device *pdev)
             schedule_delayed_work(&ds->vgpio_init_work, msecs_to_jiffies(100));
         } else {
             int i = 0;
+
+            snprintf(ds->attr_ign_v.name, sizeof(ds->attr_ign_v.name) - 1, "ignition_v");
+            ds->attr_ign_v.attr.attr.name = ds->attr_ign_v.name;
+            ds->attr_ign_v.attr.attr.mode = S_IRUGO;//|S_IWUGO;
+            ds->attr_ign_v.attr.show = dock_switch_ign_v_show;
+            ds->attr_ign_v.attr.store = 0;
+            sysfs_attr_init(&ds->attr_ign_v.attr.attr);
+            device_create_file((&ds->sdev)->dev, &ds->attr_ign_v.attr);
+
             ds->outs_base = 0;
             ds->outs_num  = 0;
             ds->outs_can_sleep  = 0;

@@ -78,6 +78,7 @@
 		ldoa17-supply = <&pm8953_l17>;
 		ldoa22-supply = <&pm8953_l22>;
 		ldoa23-supply = <&pm8953_l23>;
+		qcom,ignition_v-vadc = <&pmi632_vadc>;
 		status = "okay";
 	};
 

@@ -49,6 +49,9 @@
 //#include <linux/cpufreq.h>
 #endif
 
+#define VBATT_IS_BATTERY 0
+#define VBATT_IS_DCDC    1
+
 struct wake_lock {
 	struct wakeup_source ws;
 };
@@ -92,6 +95,7 @@ struct power_loss_monitor {
     long long pwr_lost_timer;
     int batt_is_scap;
     int portable;
+    int vbatt;
 };
 
 extern int cradle_register_notifier(struct notifier_block *nb);
@@ -508,7 +512,7 @@ static ssize_t pwr_loss_mon_in_show(struct device *dev, struct device_attribute 
         val = gpio_get_value(pwrl->pwr_lost_pin);
     }
 
-    if (0 != pwrl->bms_psy->desc->get_property(pwrl->bms_psy, POWER_SUPPLY_PROP_BATTERY_TYPE, &prop) || !prop.strval) {
+    if (!pwrl->bms_psy || 0 != pwrl->bms_psy->desc->get_property(pwrl->bms_psy, POWER_SUPPLY_PROP_BATTERY_TYPE, &prop) || !prop.strval) {
         prop.strval = "unknown";
     }
 
@@ -716,6 +720,7 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
     cradle_register_notifier(&pwrl->pwr_loss_mon_cradle_notifier);
     pwrl->pwr_lost_irq = -1;
     pwrl->pwr_lost_pin = -1;
+    pwrl->bms_psy = 0;
 
     do {
         pwrl->pctl = devm_pinctrl_get(dev);

@@ -105,7 +105,7 @@
 		/*mcn,plat-off-delay = <0xFFFFFFFF>;*/
 		interrupt-names = "pwr-loss";
 		interrupt-parent = <&tlmm>;
-		interrupts = <&tlmm 98 0>;
+		interrupts = <&tlmm 18 0>;
 		qcom,mpp2_adc-vadc = <&pm8953_vadc>;
 		status = "okay";
 	};

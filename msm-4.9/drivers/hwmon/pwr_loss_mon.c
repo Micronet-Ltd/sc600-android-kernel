@@ -51,6 +51,7 @@
 
 #define VBATT_IS_BATTERY 0
 #define VBATT_IS_DCDC    1
+#define VBATT_IS_ANY     2
 
 struct wake_lock {
 	struct wakeup_source ws;
@@ -66,6 +67,8 @@ struct power_loss_monitor {
     struct device *hmd;
     struct pinctrl *pctl;
     struct power_supply *usb_psy;
+    struct power_supply *otg_psy;
+    struct power_supply *bat_psy;
     struct power_supply *bms_psy;
     struct delayed_work pwr_lost_work;
     struct pwr_loss_mon_attr attr_state;
@@ -233,6 +236,14 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
     } else {
         usb_online = 0;
     }
+    if (!pwrl->bat_psy) {
+        pr_notice("charger power supply not ready %lld\n", ktime_to_ms(ktime_get()));
+        pwrl->bat_psy = power_supply_get_by_name("battery");
+    }
+    if (!pwrl->otg_psy) {
+        pr_notice("otg power supply not ready %lld\n", ktime_to_ms(ktime_get()));
+        pwrl->otg_psy = power_supply_get_by_name("pc_port");
+    }
     spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
 
     if (pwrl->portable) {
@@ -287,6 +298,25 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
         pwrl->pwr_lost_wan_d = pwrl->pwr_lost_wlan_d = pwrl->pwr_lost_off_d = -1;
         spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
         pr_notice("input power restored or usb charger attached %lld\n", timer);
+        if (pwrl->vbatt > -1) {
+            pwrl->vbatt = VBATT_IS_DCDC;
+            if (pwrl->usb_psy) {
+                pr_notice("restore high current supplier %lld\n", timer); 
+                prop.intval = 900 * 1000; 
+                power_supply_set_property(pwrl->usb_psy, POWER_SUPPLY_PROP_SDP_CURRENT_MAX, &prop);
+            }
+            if (pwrl->otg_psy) {
+                prop.intval = POWER_SUPPLY_SCOPE_DEVICE;
+                pr_notice("allow ufp\n");
+                power_supply_set_property(pwrl->otg_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
+            }
+            if (pwrl->bat_psy) {
+                prop.intval = 0;
+                pr_notice("resume charging\n");
+                power_supply_set_property(pwrl->bat_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
+            }
+        }
+
         for (val = num_possible_cpus() - 1; val > 0; val--) {
             if (cpu_online(val))
                 continue;
@@ -319,6 +349,24 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
             pwrl->pwr_lost_off_d = pwrl->pwr_lost_wlan_d + 100;
         }
         pr_notice("input power lost %lld\n", timer);
+        if (pwrl->vbatt > -1) {
+            pwrl->vbatt = VBATT_IS_BATTERY;
+            if (pwrl->usb_psy) {
+                pr_notice("limit standard current supplier %lld\n", timer); 
+                prop.intval = 500 * 1000; 
+                power_supply_set_property(pwrl->usb_psy, POWER_SUPPLY_PROP_SDP_CURRENT_MAX, &prop);
+            }
+            if (pwrl->otg_psy) {
+                prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+                pr_notice("cancel ufp\n");
+                power_supply_set_property(pwrl->otg_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
+            }
+            if (pwrl->bat_psy) {
+                prop.intval = 1;
+                pr_notice("suspend charging\n");
+                power_supply_set_property(pwrl->bat_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
+            }
+        }
         pr_notice("shutdown display not implemented yet %lld\n", ktime_to_ms(ktime_get()));
         power_loss_notify(pwrl, 1, 0);
         pr_notice("shudown adreno %lld\n", ktime_to_ms(ktime_get()));
@@ -636,6 +684,8 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
     pwrl->sys_ready = 0;
 
     pwrl->batt_is_scap = -1;
+    pwrl->vbatt = -1;
+
     c = of_get_property(np, "compatible", 0);
     if (c) {
         pr_err("node is found\n");
@@ -645,6 +695,10 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
         pwrl->portable = 1;
     } else {
         pwrl->portable = 0;
+    }
+
+    if (c && 0 == strncmp("mcn,pwr-loss-mon-scap-sb", c, sizeof("mcn,pwr-loss-mon-scap-sb") - sizeof(char))) {
+        pwrl->vbatt = VBATT_IS_ANY;
     }
 
     spin_lock_init(&pwrl->pwr_lost_lock);

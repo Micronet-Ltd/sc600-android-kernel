@@ -94,7 +94,7 @@
 	};
 
 	pwr_loss_mon {
-		compatible = "mcn,pwr-loss-mon";
+		compatible = "mcn,pwr-loss-mon-sb";
 		pinctrl-names = "pwr_loss_mon_active", "pwr_loss_mon_suspend";
 		pinctrl-0 = <&pwr_loss_mon_active>;
 		pinctrl-1 = <&pwr_loss_mon_suspend>;

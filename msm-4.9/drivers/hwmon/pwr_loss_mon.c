@@ -1030,6 +1030,7 @@ static void pwr_loss_mon_shutdown(struct platform_device *pdev) {
 
 static const struct of_device_id of_pwr_loss_mon_match[] = {
 	{ .compatible = "mcn,pwr-loss-mon", },
+    { .compatible = "mcn,pwr-loss-mon-sb", },
     { .compatible = "mcn,pwr-loss-mon-scap", },
 	{},
 };

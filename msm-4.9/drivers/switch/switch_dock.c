@@ -1004,7 +1004,7 @@ static void dock_switch_work_func_sb(struct work_struct *work)
 		switch_set_state(&ds->sdev, val);
 
         if (val & SWITCH_ODOCK) {
-            val = 0x11;
+            val = 0x41;
         } else {
             val = 0;
         }

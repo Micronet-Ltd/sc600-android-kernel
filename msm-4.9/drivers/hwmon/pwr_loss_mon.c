@@ -237,7 +237,7 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
         usb_online = 0;
     }
     if (!pwrl->bat_psy) {
-        pr_notice("charger power supply not ready %lld\n", ktime_to_ms(ktime_get()));
+        pr_notice("battery power supply not ready %lld\n", ktime_to_ms(ktime_get()));
         pwrl->bat_psy = power_supply_get_by_name("battery");
     }
     if (!pwrl->otg_psy) {
@@ -298,7 +298,8 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
         }
     }
 
-    if ((pwrl->pwr_lost_pin_l != val) || (usb_online && (0 == pwrl->cradle_attached)) || (pwrl->pwr_lost_off_cd < 0)) {
+    if ((pwrl->pwr_lost_pin_l != val) || (usb_online && (0 == pwrl->cradle_attached || 0x41 == pwrl->cradle_attached)) ||
+        (pwrl->pwr_lost_off_cd < 0)) {
         enable_irq_safe(pwrl->pwr_lost_irq, 0);
         spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags);
         pwrl->pwr_lost_wan_d = pwrl->pwr_lost_wlan_d = pwrl->pwr_lost_off_d = -1;
@@ -494,7 +495,7 @@ static int __ref pwr_loss_vbus_callback(struct notifier_block *nfb, unsigned lon
 
     pr_notice("vbus state %ld[%d]\n", r, pwrl->cradle_attached);
 
-    if (!pwrl->cradle_attached) {
+    if (!pwrl->cradle_attached || 0x41 == pwrl->cradle_attached) {
         enable_irq_safe(pwrl->pwr_lost_irq, 0);
 
         cancel_delayed_work(&pwrl->pwr_lost_work);

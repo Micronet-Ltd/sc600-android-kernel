@@ -107,6 +107,7 @@
 		interrupt-parent = <&tlmm>;
 		interrupts = <&tlmm 18 0>;
 		qcom,mpp2_adc-vadc = <&pm8953_vadc>;
+		mcn,batt-v-channel = <0x21>;
 		status = "okay";
 	};
 

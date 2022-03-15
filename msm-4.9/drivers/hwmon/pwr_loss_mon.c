@@ -42,6 +42,7 @@
 #include <linux/hwmon.h>
 #include <linux/power_supply.h>
 #include <linux/delay.h>
+#include <linux/qpnp/qpnp-adc.h>
 #if 0
 #include <linux/err.h>
 #include <linux/slab.h>
@@ -71,11 +72,13 @@ struct power_loss_monitor {
     struct power_supply *bat_psy;
     struct power_supply *bms_psy;
     struct delayed_work pwr_lost_work;
+    struct delayed_work pwr_lost_bat_v_work;
     struct pwr_loss_mon_attr attr_state;
     struct pwr_loss_mon_attr attr_inl;
     struct pwr_loss_mon_attr attr_wan_d;
     struct pwr_loss_mon_attr attr_wlan_d;
     struct pwr_loss_mon_attr attr_off_d;
+    struct pwr_loss_mon_attr attr_batt_v;
     struct notifier_block pwr_loss_mon_cpu_notifier;
     struct notifier_block pwr_loss_mon_remount_notifier;
     struct notifier_block pwr_loss_mon_cradle_notifier;
@@ -99,6 +102,8 @@ struct power_loss_monitor {
     int batt_is_scap;
     int portable;
     int vbatt;
+    struct qpnp_vadc_chip *vadc;
+    int batt_v_c;
 };
 
 extern int cradle_register_notifier(struct notifier_block *nb);
@@ -672,6 +677,67 @@ static ssize_t pwr_loss_mon_wland_store(struct device *dev, struct device_attrib
     return count;
 }
 
+static ssize_t pwr_loss_mon_batt_v_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
+    struct qpnp_vadc_result vadc_res;
+    int vol = 0;
+
+    if (!pwrl->vadc) {
+        pwrl->vadc = qpnp_get_vadc(pwrl->hmd, "mpp2_adc"); 
+    }
+	if(!pwrl->vadc) {
+		return sprintf(buf, "vadc for ignition_v channel not available\n");
+    }
+
+	if(qpnp_vadc_read(pwrl->vadc, pwrl->batt_v_c, &vadc_res)){
+        return sprintf(buf, "failure to retrieve vadc ignition_v channel\n");
+	}
+	vol = vadc_res.physical/1000;
+	vol *= 312;
+    vol /= 100;
+
+	return snprintf(buf, 10, "%d mV\n", vol);
+}
+
+static void __ref pwr_lost_bat_v_mon_work(struct work_struct *work)
+{
+    static int vol = 0, usb_online = 0;
+    int val = 0;//, err = 0;
+	struct power_loss_monitor *pwrl = container_of(work, struct power_loss_monitor, pwr_lost_bat_v_work.work);
+    struct qpnp_vadc_result vadc_res;
+    union power_supply_propval prop = {0,};
+
+    if (!pwrl->usb_psy) {
+        pr_notice("usb power supply not ready %lld\n", ktime_to_ms(ktime_get()));
+        pwrl->usb_psy = power_supply_get_by_name("usb");
+    }
+    if (pwrl->usb_psy) {
+        pwrl->usb_psy->desc->get_property(pwrl->usb_psy, POWER_SUPPLY_PROP_PRESENT, &prop);
+        usb_online = prop.intval;
+    }
+
+    if (!pwrl->vadc) {
+        pwrl->vadc = qpnp_get_vadc(pwrl->hmd, "mpp2_adc"); 
+    }
+
+    if(pwrl->vadc) {
+        if(qpnp_vadc_read(pwrl->vadc, pwrl->batt_v_c, &vadc_res)){
+            val = vadc_res.physical/1000;
+            val *= 312;
+            val /= 100;
+
+            if (usb_online && val != vol/*changed and batt_v in range 3.1 4.2*/) {
+                //schedule_delayed_work(&pwrl->pwr_lost_work, (timer)?msecs_to_jiffies(timer): 0);
+            } else {
+                //schedule_delayed_work(&pwrl->pwr_lost_work, (timer)?msecs_to_jiffies(timer): 0);
+            }
+        }
+    }
+
+    schedule_delayed_work(&pwrl->pwr_lost_bat_v_work, msecs_to_jiffies(30000));
+}
+
 static int pwr_loss_mon_probe(struct platform_device *pdev)
 {
 	int err, val;
@@ -914,6 +980,26 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
 
         schedule_delayed_work(&pwrl->pwr_lost_work, (pwrl->pwr_lost_off_cd > 0)?msecs_to_jiffies(pwrl->pwr_lost_off_cd/10): 0);
         power_ok_register_notifier(&pwrl->pwr_loss_mon_vbus_notifier);
+
+        if (pwrl->vbatt > -1) {
+            err = of_property_read_u32(np, "mcn,batt-v-channel", &val); 
+            if (err < 0) {
+                val = 0x21;
+            }
+            pwrl->batt_v_c = val;
+            pwrl->vadc = qpnp_get_vadc(pwrl->hmd, "mpp2_adc"); 
+
+            snprintf(pwrl->attr_batt_v.name, sizeof(pwrl->attr_batt_v.name) - 1, "batt_v"); 
+            pwrl->attr_batt_v.attr.attr.name = pwrl->attr_batt_v.name;
+            pwrl->attr_batt_v.attr.attr.mode = 0444;
+            pwrl->attr_batt_v.attr.show = pwr_loss_mon_batt_v_show;
+            pwrl->attr_batt_v.attr.store = 0;
+            sysfs_attr_init(&pwrl->attr_batt_v.attr.attr);
+            err = device_create_file(pwrl->hmd, &pwrl->attr_batt_v.attr);
+
+            INIT_DELAYED_WORK(&pwrl->pwr_lost_bat_v_work, pwr_lost_bat_v_mon_work);
+            schedule_delayed_work(&pwrl->pwr_lost_bat_v_work, (pwrl->pwr_lost_off_cd > 0)?msecs_to_jiffies(pwrl->pwr_lost_off_cd/5): msecs_to_jiffies(2000));
+        }
 
         pwrl->sys_ready = 1;
 

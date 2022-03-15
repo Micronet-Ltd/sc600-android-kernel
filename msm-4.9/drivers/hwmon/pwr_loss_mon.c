@@ -287,9 +287,15 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
         spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags);
         pwrl->pwr_lost_wan_d = pwrl->pwr_lost_wlan_d = pwrl->pwr_lost_off_d = -1;
         spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
-        enable_irq_safe(pwrl->pwr_lost_irq, 1);
+        if (pwrl->pwr_lost_pin_l == val && pwrl->vbatt > -1) {
+            spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags); 
+            pwrl->pwr_lost_timer = ktime_to_ms(ktime_get());
+            spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
+        } else {
+            enable_irq_safe(pwrl->pwr_lost_irq, 1);
 
-        return;
+            return;
+        }
     }
 
     if ((pwrl->pwr_lost_pin_l != val) || (usb_online && (0 == pwrl->cradle_attached)) || (pwrl->pwr_lost_off_cd < 0)) {
@@ -489,7 +495,7 @@ static int __ref pwr_loss_vbus_callback(struct notifier_block *nfb, unsigned lon
     pr_notice("vbus state %ld[%d]\n", r, pwrl->cradle_attached);
 
     if (!pwrl->cradle_attached) {
-        enable_irq_safe(pwrl->pwr_lost_irq, 0); 
+        enable_irq_safe(pwrl->pwr_lost_irq, 0);
 
         cancel_delayed_work(&pwrl->pwr_lost_work);
 
@@ -549,6 +555,11 @@ static ssize_t pwr_loss_mon_in_show(struct device *dev, struct device_attribute 
     if (!pwrl->usb_psy) {
         pr_notice("usb power supply not ready %lld\n", ktime_to_ms(ktime_get()));
         pwrl->usb_psy = power_supply_get_by_name("usb");
+    }
+
+    if (!pwrl->bms_psy) {
+        pr_notice("bms power supply not ready %lld\n", ktime_to_ms(ktime_get()));
+        pwrl->bms_psy = power_supply_get_by_name("bms");
     }
 
     if (pwrl->usb_psy) {
@@ -900,7 +911,7 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
 
 		pwrl->pwr_lost_timer = -1;
 
-        schedule_delayed_work(&pwrl->pwr_lost_work, (pwrl->pwr_lost_off_cd > 0)?msecs_to_jiffies(pwrl->pwr_lost_off_cd): 0);
+        schedule_delayed_work(&pwrl->pwr_lost_work, (pwrl->pwr_lost_off_cd > 0)?msecs_to_jiffies(pwrl->pwr_lost_off_cd/10): 0);
         power_ok_register_notifier(&pwrl->pwr_loss_mon_vbus_notifier);
 
         pwrl->sys_ready = 1;

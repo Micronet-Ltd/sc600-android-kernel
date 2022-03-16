@@ -87,6 +87,8 @@ struct power_loss_monitor {
 	int    pwr_lost_irq;
     int    pwr_lost_pin;
     int    pwr_lost_pin_l;
+    int    pwr_lost_batt_empty_pin;
+    int    pwr_lost_batt_empty_l;
 	int    pwr_lost_off_cd;
     int    pwr_lost_off_d;
 	int    pwr_lost_wan_cd;
@@ -320,7 +322,7 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
             if (pwrl->otg_psy) {
                 prop.intval = POWER_SUPPLY_SCOPE_DEVICE;
                 pr_notice("allow ufp\n");
-                power_supply_set_property(pwrl->otg_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
+                power_supply_set_property(pwrl->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
             }
             if (pwrl->bat_psy) {
                 prop.intval = 0;
@@ -724,6 +726,7 @@ static void __ref pwr_lost_bat_v_mon_work(struct work_struct *work)
     if(pwrl->vadc) {
         if(qpnp_vadc_read(pwrl->vadc, pwrl->batt_v_c, &vadc_res)){
             val = vadc_res.physical/1000;
+            val -= 136;
             val *= 312;
             val /= 100;
 
@@ -775,7 +778,7 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
         pwrl->portable = 0;
     }
 
-    if (c && 0 == strncmp("mcn,pwr-loss-mon-scap-sb", c, sizeof("mcn,pwr-loss-mon-scap-sb") - sizeof(char))) {
+    if (c && 0 == strncmp("mcn,pwr-loss-mon-sb", c, sizeof("mcn,pwr-loss-mon-sb") - sizeof(char))) {
         pwrl->vbatt = VBATT_IS_ANY;
     }
 
@@ -898,8 +901,6 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
         pr_notice("power loss indicator %d\n", pwrl->pwr_lost_pin);
         pr_notice("power loss active level %s\n", (pwrl->pwr_lost_pin_l)?"high":"low");
 
-
-
         pwrl->hmd = hwmon_device_register(dev);
     	if (IS_ERR(pwrl->hmd)) {
     		err = PTR_ERR(pwrl->hmd);
@@ -982,6 +983,31 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
         power_ok_register_notifier(&pwrl->pwr_loss_mon_vbus_notifier);
 
         if (pwrl->vbatt > -1) {
+            val = of_get_named_gpio_flags(np, "mcn,pwr-batt-empty", 0, (enum of_gpio_flags *)&pwrl->pwr_lost_batt_empty_l);
+            if (!gpio_is_valid(val)) {
+                pr_err("ivalid batt empty detect pin\n");
+                //err = -EINVAL;
+                //break;
+                pwrl->pwr_lost_batt_empty_pin = -1;
+                pwrl->pwr_lost_batt_empty_l = 1;
+            } else {
+                pwrl->pwr_lost_batt_empty_pin = val;
+            }
+            pwrl->pwr_lost_batt_empty_l = !pwrl->pwr_lost_batt_empty_l;
+            if (gpio_is_valid(pwrl->pwr_lost_batt_empty_pin)) {
+                err = devm_gpio_request(dev, pwrl->pwr_lost_batt_empty_pin, "battery-empty-state");
+                if (err < 0) {
+                    pr_err("failure to request the gpio[%d]\n", pwrl->pwr_lost_batt_empty_pin);
+                } else {
+                    err = gpio_direction_input(pwrl->pwr_lost_batt_empty_pin);
+                    if (err < 0) {
+                        pr_err("failure to set direction of the gpio[%d]\n", pwrl->pwr_lost_batt_empty_pin);
+                    } else {
+                        gpio_export(pwrl->pwr_lost_batt_empty_pin, 0);
+                    }
+                }
+            }
+
             err = of_property_read_u32(np, "mcn,batt-v-channel", &val); 
             if (err < 0) {
                 val = 0x21;

@@ -2081,5 +2081,33 @@
 				};
 			};
 		};
+
+		pwr_loss_batt_empty {
+			pwr_loss_batt_empty_active: pwr_loss_batt_empty_active {
+				mux {
+					pins = "gpio21";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio21";
+					drive-strength = <2>;
+					bias-disable;
+				};
+			};
+
+			pwr_loss_batt_empty_suspend: pwr_loss_batt_empty_suspend {
+				mux {
+					pins = "gpio21";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio21";
+					drive-strength = <2>;
+					bias-disable;
+				};
+			};
+		};
 	};
 };

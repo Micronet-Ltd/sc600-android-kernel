@@ -79,6 +79,7 @@ struct power_loss_monitor {
     struct pwr_loss_mon_attr attr_wlan_d;
     struct pwr_loss_mon_attr attr_off_d;
     struct pwr_loss_mon_attr attr_batt_v;
+    struct pwr_loss_mon_attr attr_batt_v_den;
     struct notifier_block pwr_loss_mon_cpu_notifier;
     struct notifier_block pwr_loss_mon_remount_notifier;
     struct notifier_block pwr_loss_mon_cradle_notifier;
@@ -106,6 +107,7 @@ struct power_loss_monitor {
     int vbatt;
     struct qpnp_vadc_chip *vadc;
     int batt_v_c;
+    int batt_v_den;
 };
 
 extern int cradle_register_notifier(struct notifier_block *nb);
@@ -335,14 +337,9 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
             if (cpu_online(val))
                 continue;
 #if defined (CONFIG_SMP)
-            pr_notice("voting for cpu%d up", val);
             err = cpu_up(val);
-            if (err && err == notifier_to_errno(NOTIFY_BAD))
-                pr_notice(" is declined\n");
-            else if (err)
-                pr_err(" failure. err:%d\n", err);
-            else
-                pr_notice("\n");
+            pr_notice("voting for cpu%d up%s %d\n", val,
+                      (err == notifier_to_errno(NOTIFY_BAD))?" is declined":(err)?" is failure":" ", err);
 #endif
         }
         adreno_suspend(pwrl, 0);
@@ -373,7 +370,7 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
             if (pwrl->otg_psy) {
                 prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
                 pr_notice("cancel ufp\n");
-                power_supply_set_property(pwrl->otg_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
+                power_supply_set_property(pwrl->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
             }
             if (pwrl->bat_psy) {
                 prop.intval = 1;
@@ -391,12 +388,8 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
             if (!cpu_online(val))
                 continue;
 #if defined (CONFIG_SMP)
-            pr_notice("voting for cpu%d down", val);
             err = cpu_down(val);
-            if (err)
-                pr_err(" is failure [%d]\n", err);
-            else
-                pr_notice( "\n");
+            pr_notice("voting for cpu%d down%s %d\n", val, (err)?" is failure":" ", err);
 #endif
         }
         timer = (pwrl->pwr_lost_wan_d > ktime_to_ms(ktime_get()))?pwrl->pwr_lost_wan_d - ktime_to_ms(ktime_get()):0;
@@ -699,7 +692,33 @@ static ssize_t pwr_loss_mon_batt_v_show(struct device *dev, struct device_attrib
 	vol *= 312;
     vol /= 100;
 
-	return snprintf(buf, 10, "%d mV\n", vol);
+	return sprintf(buf, "%d mV\n", vol);
+}
+
+static ssize_t pwr_loss_mon_batt_v_den_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    int val;
+    struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
+
+    if (!pwrl->sys_ready) {
+        return -EINVAL;
+    }
+
+    if (kstrtos32(buf, 10, &val)) 
+        return -EINVAL;
+
+    spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags);
+    pwrl->batt_v_den = val;
+    spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
+
+    return count;
+}
+
+static ssize_t pwr_loss_mon_batt_v_den_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%s\n", (pwrl->batt_v_den)?"enabled":"disabled");
 }
 
 static void __ref pwr_lost_bat_v_mon_work(struct work_struct *work)
@@ -731,9 +750,18 @@ static void __ref pwr_lost_bat_v_mon_work(struct work_struct *work)
             val /= 100;
 
             if (usb_online && val != vol/*changed and batt_v in range 3.1 4.2*/) {
+                vol = val;
                 //schedule_delayed_work(&pwrl->pwr_lost_work, (timer)?msecs_to_jiffies(timer): 0);
             } else {
                 //schedule_delayed_work(&pwrl->pwr_lost_work, (timer)?msecs_to_jiffies(timer): 0);
+            }
+            if (pwrl->batt_v_den) {
+                if (gpio_is_valid(pwrl->pwr_lost_batt_empty_pin)) {
+                    val = gpio_get_value(pwrl->pwr_lost_batt_empty_pin);
+                } else {
+                    val = 0;
+                }
+                pr_notice("%d mV [%d], %lld\n", vol, val, ktime_to_ms(ktime_get()));
             }
         }
     }
@@ -1022,6 +1050,15 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
             pwrl->attr_batt_v.attr.store = 0;
             sysfs_attr_init(&pwrl->attr_batt_v.attr.attr);
             err = device_create_file(pwrl->hmd, &pwrl->attr_batt_v.attr);
+
+            pwrl->batt_v_den = 0;
+            snprintf(pwrl->attr_batt_v_den.name, sizeof(pwrl->attr_batt_v_den.name) - 1, "batt_v_den"); 
+            pwrl->attr_batt_v_den.attr.attr.name = pwrl->attr_batt_v_den.name;
+            pwrl->attr_batt_v_den.attr.attr.mode = 0444;
+            pwrl->attr_batt_v_den.attr.show = pwr_loss_mon_batt_v_den_show;
+            pwrl->attr_batt_v_den.attr.store = pwr_loss_mon_batt_v_den_store;
+            sysfs_attr_init(&pwrl->attr_batt_v_den.attr.attr);
+            err = device_create_file(pwrl->hmd, &pwrl->attr_batt_v_den.attr);
 
             INIT_DELAYED_WORK(&pwrl->pwr_lost_bat_v_work, pwr_lost_bat_v_mon_work);
             schedule_delayed_work(&pwrl->pwr_lost_bat_v_work, (pwrl->pwr_lost_off_cd > 0)?msecs_to_jiffies(pwrl->pwr_lost_off_cd/5): msecs_to_jiffies(2000));

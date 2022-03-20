@@ -72,6 +72,7 @@
 &pmi632_charger {
 	qcom,battery-data = <&mtp_batterydata>;
 	qcom,ssmux-gpio = <&tlmm 139 GPIO_ACTIVE_LOW>;
+	qcom,sspd-gpio = <&tlmm 44 GPIO_ACTIVE_LOW>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&typec_ssmux_config>;
 };

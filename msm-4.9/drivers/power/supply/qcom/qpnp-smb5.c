@@ -379,6 +379,8 @@ static int smb5_parse_dt(struct smb5 *chip)
 {
 	struct smb_charger *chg = &chip->chg;
 	struct device_node *node = chg->dev->of_node;
+    struct pinctrl *pctl;
+    struct pinctrl_state *pctls;
 	int rc, byte_len;
 
 	if (!node) {
@@ -515,7 +517,34 @@ static int smb5_parse_dt(struct smb5 *chip)
 	chg->fcc_stepper_enable = of_property_read_bool(node,
 					"qcom,fcc-stepping-enable");
 
-	if (of_find_property(node, "qcom,ssmux-gpio", NULL)) {
+    pctl = devm_pinctrl_get(chg->dev);
+    if (!IS_ERR(pctl)) {
+        pctls = pinctrl_lookup_state(pctl, "default");
+        if (IS_ERR(pctls)) {
+            dev_err(chg->dev, "failure to get pinctrl default state\n");
+        } else {
+            rc = pinctrl_select_state(pctl, pctls);
+        }
+    } else {
+        dev_err(chg->dev, "pin control isn't used\n");
+    }
+
+    if (of_find_property(node, "qcom,sspd-gpio", 0)) {
+        chg->sspd_gpio = of_get_named_gpio_flags(node, "qcom,sspd-gpio", 0, &chg->gpio_flag);
+        if (gpio_is_valid(chg->sspd_gpio)) {
+            rc = devm_gpio_request(chg->dev, chg->sspd_gpio, "typec_sspd_gpio");
+            if (rc) {
+                dev_err(chg->dev, "sspd pin is busy\n");
+            } else {
+                gpio_direction_output(chg->sspd_gpio, !chg->gpio_flag);
+                gpio_export(chg->sspd_gpio, 1);
+            }
+        } else {
+            dev_err(chg->dev, "sspd pin isn't used\n");
+        }
+    }
+
+    if (of_find_property(node, "qcom,ssmux-gpio", NULL)) {
 		chg->ssmux_gpio = of_get_named_gpio_flags(node,
 				"qcom,ssmux-gpio", 0, &chg->gpio_flag);
 		if (!gpio_is_valid(chg->ssmux_gpio)) {

@@ -685,7 +685,7 @@ static ssize_t pwr_loss_mon_batt_v_show(struct device *dev, struct device_attrib
 		return sprintf(buf, "vadc for ignition_v channel not available\n");
     }
 
-	if(qpnp_vadc_read(pwrl->vadc, pwrl->batt_v_c, &vadc_res)){
+	if (qpnp_vadc_read(pwrl->vadc, pwrl->batt_v_c, &vadc_res)) {
         return sprintf(buf, "failure to retrieve vadc ignition_v channel\n");
 	}
 	vol = vadc_res.physical/1000;
@@ -724,7 +724,7 @@ static ssize_t pwr_loss_mon_batt_v_den_show(struct device *dev, struct device_at
 static void __ref pwr_lost_bat_v_mon_work(struct work_struct *work)
 {
     static int vol = 0, usb_online = 0;
-    int val = 0;//, err = 0;
+    int val = 0, prev_vol = 0;
 	struct power_loss_monitor *pwrl = container_of(work, struct power_loss_monitor, pwr_lost_bat_v_work.work);
     struct qpnp_vadc_result vadc_res;
     union power_supply_propval prop = {0,};
@@ -735,7 +735,8 @@ static void __ref pwr_lost_bat_v_mon_work(struct work_struct *work)
     }
     if (pwrl->usb_psy) {
         pwrl->usb_psy->desc->get_property(pwrl->usb_psy, POWER_SUPPLY_PROP_PRESENT, &prop);
-        usb_online = prop.intval;
+    } else {
+        prop.intval = 0;
     }
 
     if (!pwrl->vadc) {
@@ -743,24 +744,32 @@ static void __ref pwr_lost_bat_v_mon_work(struct work_struct *work)
     }
 
     if(pwrl->vadc) {
-        if(qpnp_vadc_read(pwrl->vadc, pwrl->batt_v_c, &vadc_res)){
+        if (0 == qpnp_vadc_read(pwrl->vadc, pwrl->batt_v_c, &vadc_res)) {
             val = vadc_res.physical/1000;
             val -= 136;
             val *= 312;
             val /= 100;
 
-            if (usb_online && val != vol/*changed and batt_v in range 3.1 4.2*/) {
+            prev_vol = vol;
+            if (val > vol && val - vol > 100) {
                 vol = val;
-                //schedule_delayed_work(&pwrl->pwr_lost_work, (timer)?msecs_to_jiffies(timer): 0);
-            } else {
-                //schedule_delayed_work(&pwrl->pwr_lost_work, (timer)?msecs_to_jiffies(timer): 0);
+            } else if (val <= vol && vol - val > 100) {
+                vol = val;
             }
+
+            if ((prev_vol < 3200 && vol > 3200) || (prev_vol > 4100 && vol < 4100) || usb_online != prop.intval) {
+                /*changed and batt_v in range 3.1 4.2*/
+                usb_online = prop.intval;
+                schedule_delayed_work(&pwrl->pwr_lost_work, 0);
+            }
+
+            if (gpio_is_valid(pwrl->pwr_lost_batt_empty_pin)) {
+                val = gpio_get_value(pwrl->pwr_lost_batt_empty_pin);
+            } else {
+                val = 0;
+            }
+
             if (pwrl->batt_v_den) {
-                if (gpio_is_valid(pwrl->pwr_lost_batt_empty_pin)) {
-                    val = gpio_get_value(pwrl->pwr_lost_batt_empty_pin);
-                } else {
-                    val = 0;
-                }
                 pr_notice("%d mV [%d], %lld\n", vol, val, ktime_to_ms(ktime_get()));
             }
         }
@@ -1054,7 +1063,7 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
             pwrl->batt_v_den = 0;
             snprintf(pwrl->attr_batt_v_den.name, sizeof(pwrl->attr_batt_v_den.name) - 1, "batt_v_den"); 
             pwrl->attr_batt_v_den.attr.attr.name = pwrl->attr_batt_v_den.name;
-            pwrl->attr_batt_v_den.attr.attr.mode = 0444;
+            pwrl->attr_batt_v_den.attr.attr.mode = 0666;
             pwrl->attr_batt_v_den.attr.show = pwr_loss_mon_batt_v_den_show;
             pwrl->attr_batt_v_den.attr.store = pwr_loss_mon_batt_v_den_store;
             sysfs_attr_init(&pwrl->attr_batt_v_den.attr.attr);

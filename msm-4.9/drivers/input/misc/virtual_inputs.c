@@ -742,11 +742,24 @@ static int __init virtual_inputs_init(void)
 static void __exit virtual_inputs_exit(void)
 {
 	struct device *dev= vinputs_dev.this_device;
+    int i;
 
     cancel_work_sync(&vdev->work);
 	sysfs_remove_group(&dev->kobj, &in_attr_group);
+    if (vdev->tlmm_based) {
+        for (i = 0; i < vdev->gpios_in.ngpio; i++) {
+            if (gpio_is_valid(vdev->gpios_in.ain[i])) {
+                if (vdev->gpios_in.ain_irq[i]) {
+                    disable_irq_nosync(vdev->gpios_in.ain_irq[i]);
+                    devm_free_irq(vdev->mdev->this_device, vdev->gpios_in.ain_irq[i], vdev);
+                }
+                devm_gpio_free(vdev->mdev->this_device, vdev->gpios_in.ain[i]);
+            }
+        }
+    }
 	input_free_device(vdev->input_dev);
 	misc_deregister(&vinputs_dev);
+
 	kfree(vdev);
 }
 

@@ -746,7 +746,6 @@ static void __ref pwr_lost_bat_v_mon_work(struct work_struct *work)
     if(pwrl->vadc) {
         if (0 == qpnp_vadc_read(pwrl->vadc, pwrl->batt_v_c, &vadc_res)) {
             val = vadc_res.physical/1000;
-            val -= 136;
             val *= 312;
             val /= 100;
 
@@ -1165,6 +1164,9 @@ static int pwr_loss_mon_remove(struct platform_device *pdev)
 	struct power_loss_monitor *pwrl = platform_get_drvdata(pdev);
 
     cancel_delayed_work(&pwrl->pwr_lost_work);
+    if (pwrl->vbatt > -1) {
+        cancel_delayed_work(&pwrl->pwr_lost_bat_v_work);
+    }
     enable_irq_safe(pwrl->pwr_lost_irq, 0);
 
 	wakeup_source_trash(&pwrl->wlock.ws);
@@ -1188,6 +1190,9 @@ static int pwr_loss_mon_remove(struct platform_device *pdev)
 	if(gpio_is_valid(pwrl->pwr_lost_pin))
 		devm_gpio_free(&pdev->dev, pwrl->pwr_lost_pin);
     dev_set_drvdata(&pdev->dev, 0);
+
+    if(gpio_is_valid(pwrl->pwr_lost_batt_empty_pin))
+        devm_gpio_free(&pdev->dev, pwrl->pwr_lost_batt_empty_pin);
 
 	devm_kfree(&pdev->dev, pwrl);
 

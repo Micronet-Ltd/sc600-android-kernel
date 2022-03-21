@@ -100,6 +100,7 @@
 		pinctrl-1 = <&pwr_loss_mon_suspend &pwr_loss_batt_empty_suspend>;
 		mcn,pwr-loss-mon = <&tlmm 18 GPIO_ACTIVE_LOW>;
 		mcn,pwr-batt-empty = <&tlmm 21 GPIO_ACTIVE_LOW>;
+		mcn,pwr-batt-chg = <&tlmm 89 GPIO_ACTIVE_LOW>;
 		mcn,wan-off-delay = <0>;
 		mcn,wlan-off-delay = <0>;
 		mcn,plat-off-delay = <180000>;

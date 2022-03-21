@@ -575,56 +575,6 @@
 			};
 		};
 
-		cdc_dmic0_clk_act: cdc_dmic0_clk_act_default {
-				mux {
-					pins = "gpio89";
-					function = "dmic0_clk";
-				};
-
-				config {
-					pins = "gpio89";
-					drive-strength = <8>;
-				};
-			};
-
-		cdc_dmic0_clk_sus: cdc_dmic0_clk_sus_sleep {
-				mux {
-					pins = "gpio89";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio89";
-					drive-strength = <2>;
-					bias-disable;
-				};
-		};
-
-		cdc_dmic0_data_act: cdc_dmic0_data_act_default {
-				mux {
-					pins = "gpio90";
-					function = "dmic0_data";
-				};
-
-				config {
-					pins = "gpio90";
-					drive-strength = <8>;
-				};
-		};
-
-		cdc_dmic0_data_sus: cdc_dmic0_data_sus_sleep {
-				mux {
-					pins = "gpio90";
-					function = "gpio";
-				};
-
-				config {
-					pins = "gpio90";
-					drive-strength = <2>;
-					bias-disable;
-				};
-		};
-
 		sec-tlmm-lines {
 			sec_tlmm_lines_act: sec_tlmm_lines_act {
 				mux {
@@ -2085,12 +2035,12 @@
 		pwr_loss_batt_empty {
 			pwr_loss_batt_empty_active: pwr_loss_batt_empty_active {
 				mux {
-					pins = "gpio21";
+					pins = "gpio21", "gpio89";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio21";
+					pins = "gpio21", "gpio89";
 					drive-strength = <2>;
 					bias-disable;
 				};
@@ -2098,12 +2048,12 @@
 
 			pwr_loss_batt_empty_suspend: pwr_loss_batt_empty_suspend {
 				mux {
-					pins = "gpio21";
+					pins = "gpio21", "gpio89";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio21";
+					pins = "gpio21", "gpio89";
 					drive-strength = <2>;
 					bias-disable;
 				};

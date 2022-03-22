@@ -90,6 +90,8 @@ struct power_loss_monitor {
     int    pwr_lost_pin_l;
     int    pwr_lost_batt_empty_pin;
     int    pwr_lost_batt_empty_l;
+    int    pwr_lost_batt_chg_pin;
+    int    pwr_lost_batt_chg_l;
 	int    pwr_lost_off_cd;
     int    pwr_lost_off_d;
 	int    pwr_lost_wan_cd;
@@ -1025,7 +1027,7 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
                 //err = -EINVAL;
                 //break;
                 pwrl->pwr_lost_batt_empty_pin = -1;
-                pwrl->pwr_lost_batt_empty_l = 1;
+                pwrl->pwr_lost_batt_empty_l = -1;
             } else {
                 pwrl->pwr_lost_batt_empty_pin = val;
             }
@@ -1040,6 +1042,31 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
                         pr_err("failure to set direction of the gpio[%d]\n", pwrl->pwr_lost_batt_empty_pin);
                     } else {
                         gpio_export(pwrl->pwr_lost_batt_empty_pin, 0);
+                    }
+                }
+            }
+
+            val = of_get_named_gpio_flags(np, "mcn,pwr-batt-chg", 0, (enum of_gpio_flags *)&pwrl->pwr_lost_batt_chg_l);
+            if (!gpio_is_valid(val)) {
+                pr_err("ivalid batt batt chg en pin\n");
+                //err = -EINVAL;
+                //break;
+                pwrl->pwr_lost_batt_chg_pin = -1;
+                pwrl->pwr_lost_batt_chg_l = -1;
+            } else {
+                pwrl->pwr_lost_batt_chg_pin = val;
+            }
+            pwrl->pwr_lost_batt_chg_l = !pwrl->pwr_lost_batt_chg_l;
+            if (gpio_is_valid(pwrl->pwr_lost_batt_chg_pin)) {
+                err = devm_gpio_request(dev, pwrl->pwr_lost_batt_chg_pin, "battery-chg-en");
+                if (err < 0) {
+                    pr_err("failure to request the gpio[%d]\n", pwrl->pwr_lost_batt_chg_pin);
+                } else {
+                    err = gpio_direction_output(pwrl->pwr_lost_batt_chg_pin, pwrl->pwr_lost_batt_chg_l);
+                    if (err < 0) {
+                        pr_err("failure to set direction of the gpio[%d]\n", pwrl->pwr_lost_batt_chg_pin);
+                    } else {
+                        gpio_export(pwrl->pwr_lost_batt_chg_pin, 0);
                     }
                 }
             }
@@ -1193,6 +1220,9 @@ static int pwr_loss_mon_remove(struct platform_device *pdev)
 
     if(gpio_is_valid(pwrl->pwr_lost_batt_empty_pin))
         devm_gpio_free(&pdev->dev, pwrl->pwr_lost_batt_empty_pin);
+
+    if(gpio_is_valid(pwrl->pwr_lost_batt_chg_pin))
+        devm_gpio_free(&pdev->dev, pwrl->pwr_lost_batt_chg_pin);
 
 	devm_kfree(&pdev->dev, pwrl);
 

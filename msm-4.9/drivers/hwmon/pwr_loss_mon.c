@@ -318,6 +318,10 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
         pr_notice("input power restored or usb charger attached %lld\n", timer);
         if (pwrl->vbatt > -1) {
             pwrl->vbatt = VBATT_IS_DCDC;
+            if (gpio_is_valid(pwrl->pwr_lost_batt_chg_pin)) {
+                pr_notice("allow BATTERY_CHARGE\n");
+                gpio_set_value(pwrl->pwr_lost_batt_chg_pin, !pwrl->pwr_lost_batt_chg_l);
+            }
             if (pwrl->usb_psy) {
                 pr_notice("restore high current supplier %lld\n", timer); 
                 prop.intval = 900 * 1000; 
@@ -378,6 +382,10 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
                 prop.intval = 1;
                 pr_notice("suspend charging\n");
                 power_supply_set_property(pwrl->bat_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
+            }
+            if (gpio_is_valid(pwrl->pwr_lost_batt_chg_pin)) {
+                pr_notice("disallow BATTERY_CHARGE\n");
+                gpio_set_value(pwrl->pwr_lost_batt_chg_pin, pwrl->pwr_lost_batt_chg_l);
             }
         }
         pr_notice("shutdown display not implemented yet %lld\n", ktime_to_ms(ktime_get()));

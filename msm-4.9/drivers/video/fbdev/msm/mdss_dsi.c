@@ -1658,6 +1658,7 @@ static int mdss_dsi_pinctrl_set_state(
 static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata;
+    struct device_node *np;
 
 	ctrl_pdata = platform_get_drvdata(pdev);
 	ctrl_pdata->pin_res.pinctrl = devm_pinctrl_get(&pdev->dev);
@@ -1677,6 +1678,11 @@ static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
 				MDSS_PINCTRL_STATE_SLEEP);
 	if (IS_ERR_OR_NULL(ctrl_pdata->pin_res.gpio_state_suspend))
 		pr_warn("%s: can not get sleep pinstate\n", __func__);
+
+    np = of_find_compatible_node(0, 0, "mcn,device-info");
+    if (np) {
+        of_node_put(np);
+    }
 
 	return 0;
 }

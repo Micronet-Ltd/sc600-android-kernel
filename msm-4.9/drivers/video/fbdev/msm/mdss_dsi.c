@@ -35,6 +35,7 @@
 #include "mdss_debug.h"
 #include "mdss_dsi_phy.h"
 #include "mdss_dba_utils.h"
+#include <linux/syscalls.h>
 
 #define XO_CLK_RATE	19200000
 #define CMDLINE_DSI_CTL_NUM_STRING_LEN 2
@@ -1681,8 +1682,42 @@ static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
 
     np = of_find_compatible_node(0, 0, "mcn,device-info");
     if (np) {
+        int id, err;
+        pr_notice("%s: mcn,device-info entry found\n", __func__);
+        id = of_get_named_gpio(np,"mcn,board-id-0", 0);
+        if (gpio_is_valid(id)) {
+            err = devm_gpio_request(&pdev->dev, id, "ldo17-level");
+            if (err >= 0) {
+                gpio_direction_input(id);
+                err = gpio_get_value(id);
+                devm_gpio_free(&pdev->dev, id);
+                ctrl_pdata->vdd_l = (err)?2800000:3300000;
+            } else {
+                long fd;
+                char bid[2];
+
+                pr_notice("%s: mcn,board-id-0 is busy, try get from board id\n", __func__);
+
+                bid[1] = 0;
+                ctrl_pdata->vdd_l = 3300000;
+                fd = sys_open("/proc/board_id", O_RDONLY, 0);
+                if (fd >= 0) {
+                    sys_read(fd, bid, 1);
+                    sys_close(fd);
+                    err = kstrtou32(bid, 16, &id);
+                    if (err >= 0) {
+                        if (id & 1) {
+                            ctrl_pdata->vdd_l = 2800000;
+                        }
+                    }
+                }
+            }
+        } else {
+            pr_notice("%s: mcn,board-id-0 not found\n", __func__);
+        }
         of_node_put(np);
     }
+    pr_notice("%s: vdd(ldo17) level config [%d uV]\n", __func__, ctrl_pdata->vdd_l);
 
 	return 0;
 }

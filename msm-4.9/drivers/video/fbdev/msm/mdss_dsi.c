@@ -612,6 +612,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 	struct device_node *supply_node = NULL;
 	const char *pm_supply_name = NULL;
 	struct device_node *supply_root_node = NULL;
+    struct mdss_dsi_ctrl_pdata *ctrl_pdata = 0;
 
 	if (!dev || !mp) {
 		pr_err("%s: invalid input\n", __func__);
@@ -685,6 +686,15 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		}
 		mp->vreg_config[i].max_voltage = tmp;
 
+        
+        ctrl_pdata = mdss_dsi_get_ctrl(0);
+
+        if (0 == strcmp(mp->vreg_config[i].vreg_name, "vdd") &&
+            (mp->vreg_config[i].max_voltage != ctrl_pdata->vdd_l || mp->vreg_config[i].min_voltage != ctrl_pdata->vdd_l)) {
+            mp->vreg_config[i].max_voltage = ctrl_pdata->vdd_l;
+            mp->vreg_config[i].min_voltage = ctrl_pdata->vdd_l;
+            dev_notice(dev, "override vdd levels\n");
+        }
 		/* enable-load */
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-enable-load", &tmp);
@@ -1660,6 +1670,8 @@ static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata;
     struct device_node *np;
+//    struct pinctrl *pctl;
+//    struct pinctrl_state *pctls;
 
 	ctrl_pdata = platform_get_drvdata(pdev);
 	ctrl_pdata->pin_res.pinctrl = devm_pinctrl_get(&pdev->dev);
@@ -1684,6 +1696,24 @@ static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
     if (np) {
         int id, err;
         pr_notice("%s: mcn,device-info entry found\n", __func__);
+//        pctl = devm_pinctrl_get(&pdev->dev);
+//        if (IS_ERR(pctl)) {
+//            dev_notice(&pdev->dev, "pin control isn't used\n");
+//            pctl = 0;
+//        }
+
+//        if (pctl) {
+//            pctls = pinctrl_lookup_state(pctl, "dev_info_active");
+//            if (IS_ERR(pctls)) {
+//                dev_err(&pdev->dev, "failure to get pinctrl active state\n");
+//            } else {
+//                err = pinctrl_select_state(pctl, pctls);
+//                if (err) {
+//                    dev_err(&pdev->dev, "failure to set dev_info_active pinctrl active state\n");
+//                }
+//            }
+//        }
+
         id = of_get_named_gpio(np,"mcn,board-id-0", 0);
         if (gpio_is_valid(id)) {
             err = devm_gpio_request(&pdev->dev, id, "ldo17-level");
@@ -1715,9 +1745,14 @@ static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
         } else {
             pr_notice("%s: mcn,board-id-0 not found\n", __func__);
         }
+
+//        if (pctl) {
+//            devm_pinctrl_put(pctl);
+//        }
         of_node_put(np);
     }
-    pr_notice("%s: vdd(ldo17) level config [%d uV]\n", __func__, ctrl_pdata->vdd_l);
+
+    pr_notice("%s: vdd(ldo17) level config [%d uV]\n", __func__, ctrl_pdata->vdd_l); 
 
 	return 0;
 }

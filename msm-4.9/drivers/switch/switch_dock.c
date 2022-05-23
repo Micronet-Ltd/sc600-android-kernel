@@ -968,12 +968,12 @@ static void dock_switch_work_func_sb(struct work_struct *work)
     char ver[16];
 
     mutex_lock(&ds->lock);
+    ds->dock_type = e_dock_type_basic;
     if (ds->dock_active_l == gpio_get_value(ds->dock_pin)) {
         pr_notice("ignition on %lld\n", ktime_to_ms(ktime_get()));
         val = (SWITCH_DOCK | SWITCH_IGN | SWITCH_ODOCK);
     } else {
         val = SWITCH_DOCK | SWITCH_ODOCK;
-        ds->dock_type = e_dock_type_basic;
         pr_notice("ignition off %lld\n", ktime_to_ms(ktime_get()));
     }
     mutex_unlock(&ds->lock);

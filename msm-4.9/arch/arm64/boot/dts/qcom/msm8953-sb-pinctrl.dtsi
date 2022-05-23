@@ -2014,7 +2014,7 @@
 				config {
 					pins = "gpio18";
 					drive-strength = <2>;
-					bias-pull-down;
+					bias-disable;
 				};
 			};
 
@@ -2027,7 +2027,7 @@
 				config {
 					pins = "gpio18";
 					drive-strength = <2>;
-					bias-pull-down;
+					bias-disable;
 				};
 			};
 		};

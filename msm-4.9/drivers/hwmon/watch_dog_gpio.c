@@ -127,7 +127,6 @@ static ssize_t toggle_active_store(struct device *dev, struct device_attribute *
     if (kstrtos32(buf, 10, &val))
         return -EINVAL;
 
-    pr_notice("%d\n", val);
     if (gpio_is_valid(wdi->toggle_pin)) {
         if (val == !wdi->suspend) {
             pr_notice("eq nothing to do\n");
@@ -142,10 +141,11 @@ static ssize_t toggle_active_store(struct device *dev, struct device_attribute *
         wdi->suspend = !val;
         spin_unlock_irqrestore(&wdi->rfkillpin_lock, wdi->lock_flags);
 
+        pr_notice("%s -> %d for %d\n", buf, val, wdi->portable);
         if (wdi->portable >= 0) {
             schedule_delayed_work(&wdi->toggle_work, 0);
         } else {
-            gpio_set_value(wdi->toggle_pin, 1);
+            gpio_set_value(wdi->toggle_pin, val);
         }
 
         return count;
@@ -419,10 +419,10 @@ static int watchdog_pin_probe(struct platform_device *op)
     }
 
     gpio_direction_output(inf->toggle_pin, inf->state);
-    gpio_export(inf->toggle_pin, 0);
+    gpio_export(inf->toggle_pin, 1);
     pr_notice("init toggle pin[%d]\n", inf->state);
     if (-1 == inf->portable) {
-        gpio_set_value(inf->toggle_pin, 1);
+        gpio_set_value(inf->toggle_pin, inf->state);
     } else {
         if (inf->high_delay || inf->low_delay) {
             pr_notice("launch toggle work[%d]\n", inf->state);

@@ -303,9 +303,11 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
             pwrl->pwr_lost_timer = ktime_to_ms(ktime_get());
             spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
         } else {
-            enable_irq_safe(pwrl->pwr_lost_irq, 1);
+            if (pwrl->vbatt < 0) {
+                enable_irq_safe(pwrl->pwr_lost_irq, 1);
 
-            return;
+                return;
+            }
         }
     }
 
@@ -352,7 +354,9 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
         wcnss_suspend(pwrl, 0);
         power_loss_notify(pwrl, 0, 0);
         enable_irq_safe(pwrl->pwr_lost_irq, 1);
-        __pm_relax(&pwrl->wlock.ws);
+        if (pwrl->pwr_lost_timer > 0) {
+            __pm_relax(&pwrl->wlock.ws);
+        }
 
         return;
     } else if (-1 == pwrl->pwr_lost_off_d) {

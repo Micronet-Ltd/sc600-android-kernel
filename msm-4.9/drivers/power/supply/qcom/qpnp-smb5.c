@@ -1090,10 +1090,31 @@ static int smb5_init_usb_port_psy(struct smb5 *chip)
  * USB MAIN PSY REGISTRATION *
  *****************************/
 
+static int smb5_usb_main_prop_is_writeable(struct power_supply *psy,
+		enum power_supply_property psp)
+{
+	int rc;
+
+	switch (psp) {
+        case POWER_SUPPLY_PROP_ONLINE:
+        case POWER_SUPPLY_PROP_PRESENT:
+            rc = 1;
+            break;
+    	default:
+    		rc = 0;
+    		break;
+	}
+
+	return rc;
+}
+
 static enum power_supply_property smb5_usb_main_props[] = {
+    POWER_SUPPLY_PROP_PRESENT,
+    POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
 	POWER_SUPPLY_PROP_TYPE,
+    POWER_SUPPLY_PROP_REAL_TYPE,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_SETTLED,
 	POWER_SUPPLY_PROP_INPUT_VOLTAGE_SETTLED,
 	POWER_SUPPLY_PROP_FCC_DELTA,
@@ -1111,16 +1132,29 @@ static int smb5_usb_main_get_prop(struct power_supply *psy,
 	int rc = 0;
 
 	switch (psp) {
-	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+    case POWER_SUPPLY_PROP_PRESENT:
+        val->intval = chg->pwr_brd_auth;
+        break;
+    case POWER_SUPPLY_PROP_ONLINE:
+        val->intval = chg->pwr_brd_auth;
+        break;
+    case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 		rc = smblib_get_charge_param(chg, &chg->param.fv, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
 		rc = smblib_get_charge_param(chg, &chg->param.fcc,
 							&val->intval);
 		break;
-	case POWER_SUPPLY_PROP_TYPE:
-		val->intval = POWER_SUPPLY_TYPE_MAIN;
+    case POWER_SUPPLY_PROP_TYPE:
+        val->intval = POWER_SUPPLY_TYPE_MAINS;
 		break;
+    case POWER_SUPPLY_PROP_REAL_TYPE:
+        if (chg->pwr_brd_auth) {
+            val->intval = POWER_SUPPLY_TYPE_MAINS; 
+        } else {
+            val->intval = POWER_SUPPLY_TYPE_MAIN; 
+        }
+        break;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_SETTLED:
 		rc = smblib_get_prop_input_current_settled(chg, val);
 		break;
@@ -1162,6 +1196,9 @@ static int smb5_usb_main_set_prop(struct power_supply *psy,
 	int rc = 0;
 
 	switch (psp) {
+    case POWER_SUPPLY_PROP_PRESENT:
+        chg->pwr_brd_auth = val->intval;
+        break; 
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 		rc = smblib_set_charge_param(chg, &chg->param.fv, val->intval);
 		break;
@@ -1213,11 +1250,12 @@ static int smb5_usb_main_set_prop(struct power_supply *psy,
 
 static const struct power_supply_desc usb_main_psy_desc = {
 	.name		= "main",
-	.type		= POWER_SUPPLY_TYPE_MAIN,
+	.type		= POWER_SUPPLY_TYPE_MAINS,
 	.properties	= smb5_usb_main_props,
 	.num_properties	= ARRAY_SIZE(smb5_usb_main_props),
 	.get_property	= smb5_usb_main_get_prop,
 	.set_property	= smb5_usb_main_set_prop,
+    .property_is_writeable = smb5_usb_main_prop_is_writeable,
 };
 
 static int smb5_init_usb_main_psy(struct smb5 *chip)

@@ -71,6 +71,7 @@ struct power_loss_monitor {
     struct power_supply *otg_psy;
     struct power_supply *bat_psy;
     struct power_supply *bms_psy;
+    struct power_supply *main_psy;
     struct delayed_work pwr_lost_work;
     struct delayed_work pwr_lost_bat_v_work;
     struct pwr_loss_mon_attr attr_state;
@@ -240,6 +241,10 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
         pr_notice("usb power supply not ready %lld\n", ktime_to_ms(ktime_get()));
         pwrl->usb_psy = power_supply_get_by_name("usb");
     }
+    if (!pwrl->main_psy) {
+        pr_notice("main power supply not ready %lld\n", ktime_to_ms(ktime_get()));
+        pwrl->main_psy = power_supply_get_by_name("main");
+    }
 
     if (pwrl->usb_psy) {
         err = pwrl->usb_psy->desc->get_property(pwrl->usb_psy, POWER_SUPPLY_PROP_PRESENT, &prop);
@@ -257,6 +262,9 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
     }
     spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
 
+    if (VBATT_IS_ANY == pwrl->vbatt) {
+        pwrl->portable = 1;
+    }
     if (pwrl->portable) {
         if (!pwrl->bms_psy) {
             pr_notice("bms power supply not ready %lld\n", ktime_to_ms(ktime_get()));
@@ -288,7 +296,10 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
             err = strncmp(prop.strval, "c801_scap_4v2_135mah_30k", strlen("c801_scap_4v2_135mah_30k"));
             /*pwrl->cradle_attached = */pwrl->batt_is_scap = (0 == err);
         }
-        if (0 == pwrl->batt_is_scap) {
+        if (VBATT_IS_ANY == pwrl->vbatt) {
+            pwrl->portable = 0;
+        }
+        if (pwrl->portable && 0 == pwrl->batt_is_scap) {
             enable_irq_safe(pwrl->pwr_lost_irq, 0);
             return;
         }
@@ -323,6 +334,11 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
             if (gpio_is_valid(pwrl->pwr_lost_batt_chg_pin)) {
                 pr_notice("allow BATTERY_CHARGE\n");
                 gpio_set_value(pwrl->pwr_lost_batt_chg_pin, !pwrl->pwr_lost_batt_chg_l);
+            }
+            if (pwrl->main_psy) {
+                prop.intval = 1;
+                pr_notice("plug main power supply\n");
+                power_supply_set_property(pwrl->main_psy, POWER_SUPPLY_PROP_PRESENT, &prop);
             }
             if (pwrl->usb_psy) {
                 pr_notice("restore high current supplier %lld\n", timer); 
@@ -386,6 +402,11 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
                 prop.intval = 1;
                 pr_notice("suspend charging\n");
                 power_supply_set_property(pwrl->bat_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
+            }
+            if (pwrl->main_psy) {
+                prop.intval = 0;
+                pr_notice("unplug main power supply\n");
+                power_supply_set_property(pwrl->main_psy, POWER_SUPPLY_PROP_PRESENT, &prop);
             }
             if (gpio_is_valid(pwrl->pwr_lost_batt_chg_pin)) {
                 pr_notice("disallow BATTERY_CHARGE\n");
@@ -499,6 +520,10 @@ static int __ref pwr_loss_cradle_callback(struct notifier_block *nfb, unsigned l
 
     pwrl->cradle_attached = r;
     pr_notice("cradle state %d\n", pwrl->cradle_attached);
+    if (pwrl->vbatt > -1) {
+        cancel_delayed_work(&pwrl->pwr_lost_work); 
+        schedule_delayed_work(&pwrl->pwr_lost_work, msecs_to_jiffies(100)); 
+    }
 
 	return NOTIFY_OK;
 }

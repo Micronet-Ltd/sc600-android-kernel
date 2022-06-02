@@ -445,6 +445,7 @@ struct smb_charger {
     int 		sspd_gpio;
 	enum of_gpio_flags gpio_flag;
     int pwr_brd_supply;
+    int pwr_brd_auth;
 };
 
 int smblib_read(struct smb_charger *chg, u16 addr, u8 *val);

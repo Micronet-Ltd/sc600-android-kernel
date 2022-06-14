@@ -24,6 +24,10 @@
 	qcom,pmic-name = "PMI632";
 };
 
+&sdhc_2 {
+	cd-gpios = <&tlmm 133 GPIO_ACTIVE_HIGH>;
+};
+
 &pm8953_l17 {
 	regulator-min-microvolt = <3000000>;
 	regulator-max-microvolt = <3300000>;

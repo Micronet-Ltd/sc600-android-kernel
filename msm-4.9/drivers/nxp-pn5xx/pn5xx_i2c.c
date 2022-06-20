@@ -18,11 +18,14 @@
  *
  */
 
+#define pr_fmt(fmt) "%s: " fmt, __func__
+#include "../../../../out/target/product/msm8953_64/obj/kernel/msm-4.9/include/generated/autoconf.h"
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/device.h>
 #include <linux/list.h>
 #include <linux/i2c.h>
 #include <linux/irq.h>
@@ -39,6 +42,7 @@
 #include <linux/of_gpio.h>
 #include <linux/regulator/consumer.h>
 #include <linux/of.h>
+#include <linux/platform_device.h>
 
 #define MAX_BUFFER_SIZE	512
 
@@ -80,6 +84,7 @@ struct pn54x_dev	{
 	struct regulator *sevdd_reg;
 	bool irq_enabled;
 	spinlock_t irq_enabled_lock;
+    int suspend;
 };
 
 /**********************************************************
@@ -249,7 +254,10 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
 		}
 
 		while (1) {
-            spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags);
+            if (pn54x_dev->suspend) {
+                break;
+            }
+            spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags); 
             pn54x_dev->irq_enabled = true;
             spin_unlock_irqrestore(&pn54x_dev->irq_enabled_lock, flags);
             enable_irq(pn54x_dev->client->irq);
@@ -696,6 +704,7 @@ static int pn54x_probe(struct i2c_client *client,
 	}
     spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags);
     pn54x_dev->irq_enabled = true;
+    pn54x_dev->suspend = 0;
     spin_unlock_irqrestore(&pn54x_dev->irq_enabled_lock, flags);
     pn54x_disable_irq(pn54x_dev);
 
@@ -768,6 +777,48 @@ static const struct i2c_device_id pn54x_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, pn54x_id);
 
+#if defined CONFIG_PM
+static int pn54x_suspend(struct device *dev)
+{
+    struct i2c_client *i2cd = to_i2c_client(dev);
+    struct pn54x_dev *pn54x_dev = i2c_get_clientdata(i2cd);
+    unsigned long flags;
+
+    spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags);
+    pn54x_dev->suspend = 1;
+    spin_unlock_irqrestore(&pn54x_dev->irq_enabled_lock, flags);
+    pn54x_disable_irq(pn54x_dev);
+
+    dev_notice(&pn54x_dev->client->dev, "irq %d disabled\n", pn54x_dev->client->irq);
+
+	return 0;
+}
+
+static int pn54x_resume(struct device *dev)
+{
+    struct i2c_client *i2cd = to_i2c_client(dev);
+    struct pn54x_dev *pn54x_dev = i2c_get_clientdata(i2cd);
+    unsigned long flags;
+
+    spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags);
+    pn54x_dev->suspend = 0;
+    spin_unlock_irqrestore(&pn54x_dev->irq_enabled_lock, flags);
+
+    dev_notice(&pn54x_dev->client->dev, "irq %d disabled\n", pn54x_dev->client->irq);
+
+	return 0;
+}
+#else
+#define pn54x_suspend 0
+#define pn54x_resume 0
+#endif
+
+static const struct dev_pm_ops pn54x_pm_ops =
+{
+	.suspend	= pn54x_suspend,
+	.resume		= pn54x_resume,
+};
+
 static struct i2c_driver pn54x_driver = {
 	.id_table	= pn54x_id,
 	.probe		= pn54x_probe,
@@ -780,6 +831,7 @@ static struct i2c_driver pn54x_driver = {
 		.owner	= THIS_MODULE,
 		.name	= "pn544",
 		.of_match_table = pn54x_dt_match,
+        .pm = &pn54x_pm_ops,
 	},
 };
 

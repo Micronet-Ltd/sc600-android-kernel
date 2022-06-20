@@ -255,12 +255,15 @@ static ssize_t pn54x_dev_read(struct file *filp, char __user *buf,
 
 		while (1) {
             if (pn54x_dev->suspend) {
+                pn54x_disable_irq(pn54x_dev);
                 break;
             }
-            spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags); 
-            pn54x_dev->irq_enabled = true;
-            spin_unlock_irqrestore(&pn54x_dev->irq_enabled_lock, flags);
-            enable_irq(pn54x_dev->client->irq);
+            if (!pn54x_dev->irq_enabled) {
+                spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags); 
+                pn54x_dev->irq_enabled = true;
+                spin_unlock_irqrestore(&pn54x_dev->irq_enabled_lock, flags);
+                enable_irq(pn54x_dev->client->irq);
+            }
 			ret = wait_event_interruptible(
 					pn54x_dev->read_wq,
 					!pn54x_dev->irq_enabled);
@@ -695,6 +698,10 @@ static int pn54x_probe(struct i2c_client *client,
 	/* request irq.  the irq is set whenever the chip has data available
 	 * for reading.  it is cleared when all data has been read.
 	 */
+    spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags);
+    pn54x_dev->irq_enabled = true;
+    pn54x_dev->suspend = 0;
+    spin_unlock_irqrestore(&pn54x_dev->irq_enabled_lock, flags);
 	pr_info("%s : requesting IRQ %d\n", __func__, client->irq);
 	ret = request_irq(client->irq, pn54x_dev_irq_handler,
 				IRQF_TRIGGER_HIGH, client->name, pn54x_dev);
@@ -702,10 +709,6 @@ static int pn54x_probe(struct i2c_client *client,
 		dev_err(&client->dev, "request_irq failed\n");
 		goto err_request_irq_failed;
 	}
-    spin_lock_irqsave(&pn54x_dev->irq_enabled_lock, flags);
-    pn54x_dev->irq_enabled = true;
-    pn54x_dev->suspend = 0;
-    spin_unlock_irqrestore(&pn54x_dev->irq_enabled_lock, flags);
     pn54x_disable_irq(pn54x_dev);
 
 	i2c_set_clientdata(client, pn54x_dev);

@@ -32,6 +32,7 @@
 //#include <linux/cred.h>
 #include <linux/dirent.h>
 //#include <linux/string.h>
+#include <linux/qpnp/qpnp-adc.h>
 #include "../misc/hi_3w/hi_3w.h"
 
 #if defined  (CONFIG_PRODUCT_TAB8_FIXED)
@@ -120,10 +121,9 @@ struct dock_switch_device {
     struct  dock_switch_attr attr_dbg_state;
     struct  dock_switch_attr attr_tuner_state;
     struct  dock_switch_attr attr_cam_ldos_state;
-    //////////////barak/////////////////////
     struct  dock_switch_attr attr_J1708_en;
     struct  dock_switch_attr attr_rs485_en;
-    ////////////////////////////////////////   
+    struct  dock_switch_attr attr_ign_v;
     spinlock_t outs_mask_lock;
     unsigned long lock_flags;
     unsigned outs_mask_state;
@@ -960,6 +960,59 @@ debounced:
 	}
 }
 
+static void dock_switch_work_func_sb(struct work_struct *work)
+{
+	struct dock_switch_device *ds  = container_of(work, struct dock_switch_device, work);
+    int val = 0;
+    uint32_t fd;
+    char ver[16];
+
+    mutex_lock(&ds->lock);
+    ds->dock_type = e_dock_type_basic;
+    if (ds->dock_active_l == gpio_get_value(ds->dock_pin)) {
+        pr_notice("ignition on %lld\n", ktime_to_ms(ktime_get()));
+        val = (SWITCH_DOCK | SWITCH_IGN | SWITCH_ODOCK);
+    } else {
+        val = SWITCH_DOCK | SWITCH_ODOCK;
+        pr_notice("ignition off %lld\n", ktime_to_ms(ktime_get()));
+    }
+    mutex_unlock(&ds->lock);
+
+    if (ds->sched_irq & SWITCH_IGN) {
+        pr_notice("enable ign/dock monitor irq[%d]\n", ds->dock_irq);
+        ds->sched_irq &= ~SWITCH_IGN;
+        enable_switch_irq(ds->dock_irq, 1);
+    }
+
+    ds->sched_irq &= ~SWITCH_DOCK;
+
+    if (ds->state != val) {
+        pr_notice("dock state changed to %d\n", val);
+        fd = sys_open("/proc/mcu_version", O_WRONLY, 0);
+        if (fd >= 0) {
+            sprintf(ver, "net888.v2");
+            sys_write(fd, ver, strlen(ver));
+            sys_close(fd);
+        }
+
+        if (val & SWITCH_IGN) {
+            __pm_stay_awake(&ds->wlock.ws);
+        } else {
+            __pm_relax(&ds->wlock.ws);
+        }
+		ds->state = val;
+		switch_set_state(&ds->sdev, val);
+
+        if (val & SWITCH_ODOCK) {
+            val = 0x41;
+        } else {
+            val = 0;
+        }
+
+        cradle_notify(val, 0);
+	}
+}
+
 static irqreturn_t dock_switch_irq_handler(int irq, void *arg)
 {
 	struct dock_switch_device *ds = (struct dock_switch_device *)arg;
@@ -968,7 +1021,7 @@ static irqreturn_t dock_switch_irq_handler(int irq, void *arg)
     int sched = 0;
 
 // Vladimir
-// the pins IGN and CRADLE_DETECT ara swapped in hardware
+// the pins IGN and CRADLE_DETECT ara swapped in a9 hardware
 //
 
     irq_desc = irq_to_desc(irq);
@@ -1027,90 +1080,10 @@ static int32_t __ref dock_switch_ign_callback(struct notifier_block *nfb, unsign
     return NOTIFY_OK;
 }
 
-#if 0
-//unsigned long long de_buf[(sizeof(struct linux_dirent64) + 260)/sizeof(unsigned long long)];
-static int find_dir_by_label(char *root, char *label, char *out, int out_len)
-{
-	struct linux_dirent64 *de;
-	int fd,lfd, des, err = -1, i;
-    mm_segment_t prev_fs;
-    char de_buf[sizeof(struct linux_dirent64) + 260];
-    char lfname[64], lbl[64];
-
-    prev_fs = get_fs();
-	set_fs(get_ds());
-
-    fd = sys_open(root, O_DIRECTORY|O_RDONLY, S_IRUSR|S_IRGRP);
-    if (fd) {
-        do {
-            de = (struct linux_dirent64 *)de_buf;
-            des = sys_getdents64(fd, de, sizeof(de_buf)); 
-            if (des < 0) {
-                pr_notice("failure to read %s entry [%lx, %lu]%d\n", root, (unsigned long)de_buf, sizeof(de_buf), des);
-                err = -1;
-            } else if (0 == des) {
-                //pr_notice("last entry\n");
-                err = 0;
-            } else {
-                i = 0;
-                do {
-                    de = (struct linux_dirent64 *)&de_buf[i];
-                    if (DT_DIR == de->d_type || DT_LNK == de->d_type) {
-                        err = 0;
-                        //pr_notice("found %s entry [%d, %d, %d]\n", de->d_name, de->d_reclen, de->d_type, des);
-                        sprintf(lfname, "%s%s/label", root, de->d_name);
-                        lfd = sys_open(lfname, O_RDONLY, S_IRUSR|S_IRGRP);
-                        if (lfd) {
-                            err = sys_read(lfd, lbl, sizeof(lbl) - 1);
-                            sys_close(lfd);
-                            if (err > 0) {
-                                err--;
-                                if (err >= sizeof(lbl)) {
-                                    err = sizeof(lbl) - 1;
-                                }
-                                if (err > out_len) {
-                                    err = out_len - 1;
-                                }
-                                lbl[err] = 0; 
-                                //pr_notice("is %s [%s] match to %s\n", lfname, lbl, label);
-                                if (0 == strncmp(lbl, label, out_len)) {
-                                    des = 0;
-                                    err = 0;
-                                    //pr_notice("found\n");
-                                    strncpy(out, de->d_name, out_len);
-                                    break;
-                                }
-                            }
-                        }
-                    } else {
-                        //pr_notice("%s entry [%d, %d, %d] isn't directory\n", de->d_name, de->d_reclen, de->d_type, des);
-                    }
-                    i += de->d_reclen;
-                } while (i < des);
-            }
-        } while (des > 0);
-        sys_close(fd);
-    }
-
-    set_fs(prev_fs);
-
-    return err;
-}
-#endif
-
 static ssize_t dock_switch_outs_mask_state_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
     struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
-
-#if 0
-    spin_lock_irqsave(&inf->rfkillpin_lock, inf->lock_flags);
-    if (kstrtos32(buf, 10, &val))
-    spin_unlock_irqrestore(&inf->rfkillpin_lock, inf->lock_flags);
-#endif
-//    pr_notice("already initialized %d..%d\n", ds->outs_base, ds->outs_base + ds->outs_num - 1);
-//    ds->outs_base = ds->outs_num = -1;
-//    schedule_delayed_work(&ds->vgpio_init_work, msecs_to_jiffies(1000));
 
     return sprintf(buf, "%x\n", ds->outs_mask_state); 
 }
@@ -1443,12 +1416,32 @@ static ssize_t dock_switch_cam_ldos_state_store(struct device *dev, struct devic
     return count; 
 }
 
+static ssize_t dock_switch_ign_v_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
+    struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
+    struct qpnp_vadc_chip *vadc;
+    struct qpnp_vadc_result vadc_res;
+    int vol = 0;
+
+	vadc = qpnp_get_vadc(ds->pdev,"ignition_v");
+	if(!vadc) {
+		return sprintf(buf, "vadc for ignition_v channel not available\n");
+    }
+
+	if(qpnp_vadc_read(vadc, 0x13, &vadc_res)){
+        return sprintf(buf, "failure to retrieve vadc ignition_v channel\n");
+	}
+	vol = vadc_res.physical/1000;
+	vol *= 22;
+
+	return snprintf(buf, 10, "%d mV\n", vol);
+}
+
 static int gpc_lable_match(struct gpio_chip *gpc, void *lbl)
 {
 	return !strcmp(gpc->label, lbl);
 }
-
-////////////////////////////////////////////////////////////////////////////////////////
 
 static void mcu_gpio_init_work(struct work_struct *work)
 {
@@ -1503,20 +1496,15 @@ static void mcu_gpio_init_work(struct work_struct *work)
 
     schedule_delayed_work(&ds->mcu_gpio_init_work, msecs_to_jiffies(1000));
 }
-///////////////////////////////////////////////////////////////////////////////////////////////
 
 static void swithc_dock_outs_init_work(struct work_struct *work)
 {
     struct dock_switch_device *ds = container_of(work, struct dock_switch_device, vgpio_init_work.work);
     static int secs = 60;
     int err = -1, i = 0;
-//    int fd;
-//    char gpiochip_dir[32];
     char gp_file[64];
-//    mm_segment_t prev_fs;
     struct gpio_chip *gpc;
 
-#if 1
     if ((-1 != ds->outs_num && -1 != ds->outs_base) || (secs <= 0)) {
         secs = 60;
         return;
@@ -1525,7 +1513,7 @@ static void swithc_dock_outs_init_work(struct work_struct *work)
     gpc = gpiochip_find("vgpio_out", gpc_lable_match);
 
     if (gpc) {
-        ds->outs_base = gpc->base;
+        ds->outs_base = 0;
         ds->outs_num  = gpc->ngpio;
         ds->outs_can_sleep  = gpc->can_sleep;
         for (i = 0; i < ds->outs_num; i++) {
@@ -1545,70 +1533,6 @@ static void swithc_dock_outs_init_work(struct work_struct *work)
         return;
     }
 
-#else
-    if ((-1 != ds->outs_num && -1 != ds->outs_base) || (secs <= 0)) {
-        secs = 60;
-        return;
-    }
-
-    secs--;
-    err = find_dir_by_label("/sys/class/gpio/", "vgpio_out", gpiochip_dir, (sizeof(gpiochip_dir) - sizeof(gpiochip_dir[0])) / sizeof(gpiochip_dir[0])); 
-
-    if (0 == err) {
-        prev_fs = get_fs();
-        set_fs(get_ds());
-        sprintf(gp_file, "/sys/class/gpio/%s/base", gpiochip_dir);
-        fd = sys_open(gp_file, O_RDONLY, S_IRUSR|S_IRGRP);
-        if (fd) {
-            err = sys_read(fd, gp_file, 8); 
-            sys_close(fd);
-            if (err > 0) {
-                err--;
-                if (err > 7) {
-                    err = 7;
-                }
-                gp_file[err] = 0; 
-                ds->outs_base = simple_strtoul(gp_file, 0, 10);
-            }
-        }
-        sprintf(gp_file, "/sys/class/gpio/%s/ngpio", gpiochip_dir);
-        fd = sys_open(gp_file, O_RDONLY, S_IRUSR|S_IRGRP);
-        if (fd) {
-            err = sys_read(fd, gp_file, 8); 
-            sys_close(fd);
-            if (err > 0) {
-                err--;
-                if (err > 7) {
-                    err = 7;
-                }
-                gp_file[err] = 0; 
-                ds->outs_num = simple_strtoul(gp_file, 0, 10);
-                if (ds->outs_num > VGPIO_MAX) {
-                    ds->outs_num = VGPIO_MAX;
-                }
-            }
-        }
-
-        pr_notice("%s %d..%d\n", gpiochip_dir, ds->outs_base, ds->outs_base + ds->outs_num - 1);
-
-        set_fs(prev_fs);
-
-        for (i = 0; i < ds->outs_num; i++) {
-            if (gpio_is_valid(ds->outs_base + i)) {
-                sprintf(gp_file, "virtual_out_%d", i);
-                err = devm_gpio_request(ds->pdev, ds->outs_base + i, gp_file);
-                if (err) {
-                    pr_err("virtual out [%d] is busy!\n", ds->outs_base + i);
-                } else {
-                    ds->outs_pins[i] = ds->outs_base + i;
-                    gpio_direction_output(ds->outs_pins[i], 0);
-                    gpio_export(ds->outs_pins[i], 0);
-                }
-            }
-        }
-    }
-#endif
-
     schedule_delayed_work(&ds->vgpio_init_work, msecs_to_jiffies(1000));
 }
 
@@ -1616,6 +1540,7 @@ static void swithc_dock_outs_init_work(struct work_struct *work)
 // Portable and fix tab8 otehrwize smart cam that alwys fix
 //
 #define DOCK_SWITCH_PORTABLE 1
+#define DOCK_SWITCH_SB       2
 
 static int dock_switch_probe(struct platform_device *pdev)
 {
@@ -1638,10 +1563,14 @@ static int dock_switch_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
     c = of_get_property(np, "compatible", NULL);
-    if (c && 0 == strncmp("mcn,fixed-dock-switch", c, sizeof("mcn,fixed-dock-switch") - sizeof(char))) {
-        compatible = !DOCK_SWITCH_PORTABLE;
+    if (c) {
+        if (0 == strncmp("mcn,sb-dock-switch", c, sizeof("mcn,sb-dock-switch") - sizeof(char))) {
+            compatible = DOCK_SWITCH_SB;
+        } else if (0 == strncmp("mcn,fixed-dock-switch", c, sizeof("mcn,fixed-dock-switch") - sizeof(char))) {
+            compatible = !DOCK_SWITCH_PORTABLE; 
+        }
     }
-    pr_notice("TAB8 %s \n", (DOCK_SWITCH_PORTABLE == compatible)?"portable":"fixed");
+    dev_notice(dev, "%s: %s \n", (DOCK_SWITCH_SB == compatible)?"Single board net888":"TAB8 based", (DOCK_SWITCH_PORTABLE == compatible)?"portable":"fixed");
 
     ds->state = 0;
     do {
@@ -1832,16 +1761,21 @@ static int dock_switch_probe(struct platform_device *pdev)
                 }
             }
 
-			INIT_WORK(&ds->work, dock_switch_work_func_fix);
+            if (DOCK_SWITCH_SB == compatible) {
+                INIT_WORK(&ds->work, dock_switch_work_func_sb);
+            } else {
+                INIT_WORK(&ds->work, dock_switch_work_func_fix);
 
-			ds->ignition_notifier.notifier_call = dock_switch_ign_callback;
-			err = gpio_in_register_notifier(&ds->ignition_notifier);
-			if (err) {
-				pr_err("failure to register remount notifier [%d]\n", err);
-				err = -EINVAL;
-				break;
-			}
+                ds->ignition_notifier.notifier_call = dock_switch_ign_callback;
+                err = gpio_in_register_notifier(&ds->ignition_notifier);
+                if (err) {
+                    pr_err("failure to register vin notifier [%d]\n", err);
+                    err = -EINVAL;
+                    break;
+                }
+            }
 		}
+
         ds->sdev.name = "dock";
         ds->sdev.print_state = dock_switch_print_state;
         err = switch_dev_register(&ds->sdev);
@@ -1849,10 +1783,13 @@ static int dock_switch_probe(struct platform_device *pdev)
             pr_err("err_register_switch\n");
             break;
         }
-    	err = device_create_file((&ds->sdev)->dev, &dev_attr_ampl_enable);
-    	if (err < 0) {
-            pr_err("err0r create amplifier file\n");
-            break;
+
+        if (DOCK_SWITCH_SB != compatible) {
+        	err = device_create_file((&ds->sdev)->dev, &dev_attr_ampl_enable);
+        	if (err < 0) {
+                pr_err("err0r create amplifier file\n");
+                break;
+            }
         }
 
         spin_lock_init(&ds->outs_mask_lock);
@@ -1921,31 +1858,78 @@ static int dock_switch_probe(struct platform_device *pdev)
         device_create_file((&ds->sdev)->dev, &ds->attr_cam_ldos_state.attr);
         //en_all_cam_ldos(ds, 1);
 
-        /////////////////////////////////////////////////////////////////////////////////////////////
+        if (DOCK_SWITCH_SB != compatible) {
+            snprintf(ds->attr_J1708_en.name, sizeof(ds->attr_J1708_en.name) - 1, "J1708_en");
+            ds->attr_J1708_en.attr.attr.name  = ds->attr_J1708_en.name;
+            ds->attr_J1708_en.attr.attr.mode = S_IRUGO|S_IWUGO;//666
+            ds->attr_J1708_en.attr.show = j1708_en_state_show;
+            ds->attr_J1708_en.attr.store = j1708_en_state_store;
+            sysfs_attr_init(&ds->attr_J1708_en.attr.attr);
+            device_create_file((&ds->sdev)->dev, &ds->attr_J1708_en.attr);
 
-        snprintf(ds->attr_J1708_en.name, sizeof(ds->attr_J1708_en.name) - 1, "J1708_en");
-        ds->attr_J1708_en.attr.attr.name  = ds->attr_J1708_en.name;
-        ds->attr_J1708_en.attr.attr.mode = S_IRUGO|S_IWUGO;//666
-        ds->attr_J1708_en.attr.show = j1708_en_state_show;
-        ds->attr_J1708_en.attr.store = j1708_en_state_store;
-        sysfs_attr_init(&ds->attr_J1708_en.attr.attr);
-        device_create_file((&ds->sdev)->dev, &ds->attr_J1708_en.attr);
+            snprintf(ds->attr_rs485_en.name, sizeof(ds->attr_rs485_en.name) - 1, "rs485_en");
+            ds->attr_rs485_en.attr.attr.name = ds->attr_rs485_en.name;
+            ds->attr_rs485_en.attr.attr.mode = S_IRUGO|S_IWUGO;//666
+            ds->attr_rs485_en.attr.show = rs485_en_state_show;
+            ds->attr_rs485_en.attr.store = rs485_en_state_store;
+            sysfs_attr_init(&ds->attr_rs485_en.attr.attr);
+            device_create_file((&ds->sdev)->dev, &ds->attr_rs485_en.attr);
 
-        snprintf(ds->attr_rs485_en.name, sizeof(ds->attr_rs485_en.name) - 1, "rs485_en");
-        ds->attr_rs485_en.attr.attr.name = ds->attr_rs485_en.name;
-        ds->attr_rs485_en.attr.attr.mode = S_IRUGO|S_IWUGO;//666
-        ds->attr_rs485_en.attr.show = rs485_en_state_show;
-        ds->attr_rs485_en.attr.store = rs485_en_state_store;
-        sysfs_attr_init(&ds->attr_rs485_en.attr.attr);
-        device_create_file((&ds->sdev)->dev, &ds->attr_rs485_en.attr);
+            INIT_DELAYED_WORK(&ds->mcu_gpio_init_work, mcu_gpio_init_work);
+            schedule_delayed_work(&ds->mcu_gpio_init_work, msecs_to_jiffies(100));
 
-        INIT_DELAYED_WORK(&ds->mcu_gpio_init_work, mcu_gpio_init_work);
-        schedule_delayed_work(&ds->mcu_gpio_init_work, msecs_to_jiffies(100));
+            INIT_DELAYED_WORK(&ds->vgpio_init_work, swithc_dock_outs_init_work);
+            schedule_delayed_work(&ds->vgpio_init_work, msecs_to_jiffies(100));
+        } else {
+            int i = 0;
 
-        ////////////////////////////////////////////////////
+            snprintf(ds->attr_ign_v.name, sizeof(ds->attr_ign_v.name) - 1, "ignition_v");
+            ds->attr_ign_v.attr.attr.name = ds->attr_ign_v.name;
+            ds->attr_ign_v.attr.attr.mode = S_IRUGO;//|S_IWUGO;
+            ds->attr_ign_v.attr.show = dock_switch_ign_v_show;
+            ds->attr_ign_v.attr.store = 0;
+            sysfs_attr_init(&ds->attr_ign_v.attr.attr);
+            device_create_file((&ds->sdev)->dev, &ds->attr_ign_v.attr);
 
-        INIT_DELAYED_WORK(&ds->vgpio_init_work, swithc_dock_outs_init_work);
-        schedule_delayed_work(&ds->vgpio_init_work, msecs_to_jiffies(100));
+            ds->outs_base = 0;
+            ds->outs_num  = 0;
+            ds->outs_can_sleep  = 0;
+            ds->outs_pins[i] = of_get_named_gpio_flags(np,"mcn,aout-0", 0, (enum of_gpio_flags *)&ds->otg_en_l);
+            if (gpio_is_valid(ds->outs_pins[i])) {
+                ds->otg_en_l = !ds->otg_en_l;
+                err = devm_gpio_request(dev, ds->outs_pins[i], "aout-0");
+                if (err) {
+                    dev_err(dev, "aout[%d] busy\n", ds->outs_pins[i]);
+                    ds->outs_pins[i] = -1;
+                } else {
+                    ds->outs_can_sleep = gpio_cansleep(ds->outs_pins[i]);
+                    gpio_direction_output(ds->outs_pins[i], ds->otg_en_l);
+                    gpio_export(ds->outs_pins[i], 0);
+                    ds->outs_num++;
+                    i++;
+                }
+            } else {
+                ds->outs_pins[i] = -1;
+            }
+
+            ds->outs_pins[i] = of_get_named_gpio_flags(np,"mcn,aout-1", 0, (enum of_gpio_flags *)&ds->otg_en_l);
+            if (gpio_is_valid(ds->outs_pins[i])) {
+                ds->otg_en_l = !ds->otg_en_l;
+                err = devm_gpio_request(dev, ds->outs_pins[i], "aout-1");
+                if (err) {
+                    dev_err(dev, "aout[%d] busy\n", ds->outs_pins[i]);
+                    ds->outs_pins[i] = -1;
+                } else {
+                    ds->outs_can_sleep = gpio_cansleep(ds->outs_pins[i]);
+                    gpio_direction_output(ds->outs_pins[i], ds->otg_en_l);
+                    gpio_export(ds->outs_pins[i], 0);
+                    ds->outs_num++;
+                    i++;
+                }
+            } else {
+                ds->outs_pins[i] = -1;
+            }
+        }
 
         return 0;
     } while (0);
@@ -2062,6 +2046,7 @@ static const struct dev_pm_ops dock_switch_pm_ops = {
 static struct of_device_id dock_switch_match[] = {
 	{ .compatible = "mcn,dock-switch", },
     { .compatible = "mcn,fixed-dock-switch", },
+    { .compatible = "mcn,sb-dock-switch", },
 	{},
 };
 

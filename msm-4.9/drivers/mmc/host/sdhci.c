@@ -3185,6 +3185,7 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 		(command != MMC_BUS_TEST_R)) {
 		host->data->error = -EILSEQ;
 		host->mmc->err_stats[MMC_ERR_DAT_CRC]++;
+        pr_notice("%s: SDHCI_INT_DATA_CRC %x, %x\n", __func__, command, intmask);
 	}
 	else if (intmask & SDHCI_INT_ADMA_ERROR) {
 		pr_err("%s: ADMA error\n", mmc_hostname(host->mmc));

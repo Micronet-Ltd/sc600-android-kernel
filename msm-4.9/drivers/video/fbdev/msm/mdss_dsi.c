@@ -35,6 +35,7 @@
 #include "mdss_debug.h"
 #include "mdss_dsi_phy.h"
 #include "mdss_dba_utils.h"
+#include <linux/syscalls.h>
 
 #define XO_CLK_RATE	19200000
 #define CMDLINE_DSI_CTL_NUM_STRING_LEN 2
@@ -611,6 +612,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 	struct device_node *supply_node = NULL;
 	const char *pm_supply_name = NULL;
 	struct device_node *supply_root_node = NULL;
+    struct mdss_dsi_ctrl_pdata *ctrl_pdata = 0;
 
 	if (!dev || !mp) {
 		pr_err("%s: invalid input\n", __func__);
@@ -684,6 +686,15 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		}
 		mp->vreg_config[i].max_voltage = tmp;
 
+        
+        ctrl_pdata = mdss_dsi_get_ctrl(0);
+
+        if (0 == strcmp(mp->vreg_config[i].vreg_name, "vdd") &&
+            (mp->vreg_config[i].max_voltage != ctrl_pdata->vdd_l || mp->vreg_config[i].min_voltage != ctrl_pdata->vdd_l)) {
+            mp->vreg_config[i].max_voltage = ctrl_pdata->vdd_l;
+            mp->vreg_config[i].min_voltage = ctrl_pdata->vdd_l;
+            dev_notice(dev, "override vdd levels\n");
+        }
 		/* enable-load */
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-enable-load", &tmp);
@@ -757,7 +768,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 			mp->vreg_config[i].post_off_sleep = tmp;
 		}
 
-		pr_debug("%s: %s min=%d, max=%d, enable=%d, disable=%d, ulp_load=%d preonsleep=%d, postonsleep=%d, preoffsleep=%d, postoffsleep=%d\n",
+		pr_notice("%s: %s min=%d, max=%d, enable=%d, disable=%d, ulp_load=%d preonsleep=%d, postonsleep=%d, preoffsleep=%d, postoffsleep=%d\n",
 			__func__,
 			mp->vreg_config[i].vreg_name,
 			mp->vreg_config[i].min_voltage,
@@ -1658,6 +1669,9 @@ static int mdss_dsi_pinctrl_set_state(
 static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata;
+    struct device_node *np;
+//    struct pinctrl *pctl;
+//    struct pinctrl_state *pctls;
 
 	ctrl_pdata = platform_get_drvdata(pdev);
 	ctrl_pdata->pin_res.pinctrl = devm_pinctrl_get(&pdev->dev);
@@ -1677,6 +1691,68 @@ static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
 				MDSS_PINCTRL_STATE_SLEEP);
 	if (IS_ERR_OR_NULL(ctrl_pdata->pin_res.gpio_state_suspend))
 		pr_warn("%s: can not get sleep pinstate\n", __func__);
+
+    np = of_find_compatible_node(0, 0, "mcn,device-info");
+    if (np) {
+        int id, err;
+        pr_notice("%s: mcn,device-info entry found\n", __func__);
+//        pctl = devm_pinctrl_get(&pdev->dev);
+//        if (IS_ERR(pctl)) {
+//            dev_notice(&pdev->dev, "pin control isn't used\n");
+//            pctl = 0;
+//        }
+
+//        if (pctl) {
+//            pctls = pinctrl_lookup_state(pctl, "dev_info_active");
+//            if (IS_ERR(pctls)) {
+//                dev_err(&pdev->dev, "failure to get pinctrl active state\n");
+//            } else {
+//                err = pinctrl_select_state(pctl, pctls);
+//                if (err) {
+//                    dev_err(&pdev->dev, "failure to set dev_info_active pinctrl active state\n");
+//                }
+//            }
+//        }
+
+        id = of_get_named_gpio(np,"mcn,board-id-0", 0);
+        if (gpio_is_valid(id)) {
+            err = devm_gpio_request(&pdev->dev, id, "ldo17-level");
+            if (err >= 0) {
+                gpio_direction_input(id);
+                err = gpio_get_value(id);
+                devm_gpio_free(&pdev->dev, id);
+                ctrl_pdata->vdd_l = (err)?2800000:3300000;
+            } else {
+                long fd;
+                char bid[2];
+
+                pr_notice("%s: mcn,board-id-0 is busy, try get from board id\n", __func__);
+
+                bid[1] = 0;
+                ctrl_pdata->vdd_l = 3300000;
+                fd = sys_open("/proc/board_id", O_RDONLY, 0);
+                if (fd >= 0) {
+                    sys_read(fd, bid, 1);
+                    sys_close(fd);
+                    err = kstrtou32(bid, 16, &id);
+                    if (err >= 0) {
+                        if (id & 1) {
+                            ctrl_pdata->vdd_l = 2800000;
+                        }
+                    }
+                }
+            }
+        } else {
+            pr_notice("%s: mcn,board-id-0 not found\n", __func__);
+        }
+
+//        if (pctl) {
+//            devm_pinctrl_put(pctl);
+//        }
+        of_node_put(np);
+    }
+
+    pr_notice("%s: vdd(ldo17) level config [%d uV]\n", __func__, ctrl_pdata->vdd_l); 
 
 	return 0;
 }

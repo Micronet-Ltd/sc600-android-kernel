@@ -437,13 +437,15 @@ struct smb_charger {
 	u32			flash_derating_soc;
 	u32			flash_disable_soc;
 	u32			headroom_mode;
-	bool			flash_init_done;
-	bool			flash_active;
+	bool		flash_init_done;
+	bool		flash_active;
 
 	/*typec ssmux jeffery add*/
-	int 			ssmux_gpio;
+	int 		ssmux_gpio;
+    int 		sspd_gpio;
 	enum of_gpio_flags gpio_flag;
     int pwr_brd_supply;
+    int pwr_brd_auth;
 };
 
 int smblib_read(struct smb_charger *chg, u16 addr, u8 *val);

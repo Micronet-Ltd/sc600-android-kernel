@@ -42,12 +42,17 @@
 #include <linux/hwmon.h>
 #include <linux/power_supply.h>
 #include <linux/delay.h>
+#include <linux/qpnp/qpnp-adc.h>
 #if 0
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/fcntl.h>
 //#include <linux/cpufreq.h>
 #endif
+
+#define VBATT_IS_BATTERY 0
+#define VBATT_IS_DCDC    1
+#define VBATT_IS_ANY     2
 
 struct wake_lock {
 	struct wakeup_source ws;
@@ -63,13 +68,19 @@ struct power_loss_monitor {
     struct device *hmd;
     struct pinctrl *pctl;
     struct power_supply *usb_psy;
+    struct power_supply *otg_psy;
+    struct power_supply *bat_psy;
     struct power_supply *bms_psy;
+    struct power_supply *main_psy;
     struct delayed_work pwr_lost_work;
+    struct delayed_work pwr_lost_bat_v_work;
     struct pwr_loss_mon_attr attr_state;
     struct pwr_loss_mon_attr attr_inl;
     struct pwr_loss_mon_attr attr_wan_d;
     struct pwr_loss_mon_attr attr_wlan_d;
     struct pwr_loss_mon_attr attr_off_d;
+    struct pwr_loss_mon_attr attr_batt_v;
+    struct pwr_loss_mon_attr attr_batt_v_den;
     struct notifier_block pwr_loss_mon_cpu_notifier;
     struct notifier_block pwr_loss_mon_remount_notifier;
     struct notifier_block pwr_loss_mon_cradle_notifier;
@@ -78,6 +89,10 @@ struct power_loss_monitor {
 	int    pwr_lost_irq;
     int    pwr_lost_pin;
     int    pwr_lost_pin_l;
+    int    pwr_lost_batt_empty_pin;
+    int    pwr_lost_batt_empty_l;
+    int    pwr_lost_batt_chg_pin;
+    int    pwr_lost_batt_chg_l;
 	int    pwr_lost_off_cd;
     int    pwr_lost_off_d;
 	int    pwr_lost_wan_cd;
@@ -92,6 +107,10 @@ struct power_loss_monitor {
     long long pwr_lost_timer;
     int batt_is_scap;
     int portable;
+    int vbatt;
+    struct qpnp_vadc_chip *vadc;
+    int batt_v_c;
+    int batt_v_den;
 };
 
 extern int cradle_register_notifier(struct notifier_block *nb);
@@ -222,6 +241,10 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
         pr_notice("usb power supply not ready %lld\n", ktime_to_ms(ktime_get()));
         pwrl->usb_psy = power_supply_get_by_name("usb");
     }
+    if (!pwrl->main_psy) {
+        pr_notice("main power supply not ready %lld\n", ktime_to_ms(ktime_get()));
+        pwrl->main_psy = power_supply_get_by_name("main");
+    }
 
     if (pwrl->usb_psy) {
         err = pwrl->usb_psy->desc->get_property(pwrl->usb_psy, POWER_SUPPLY_PROP_PRESENT, &prop);
@@ -229,8 +252,19 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
     } else {
         usb_online = 0;
     }
+    if (!pwrl->bat_psy) {
+        pr_notice("battery power supply not ready %lld\n", ktime_to_ms(ktime_get()));
+        pwrl->bat_psy = power_supply_get_by_name("battery");
+    }
+    if (!pwrl->otg_psy) {
+        pr_notice("otg power supply not ready %lld\n", ktime_to_ms(ktime_get()));
+        pwrl->otg_psy = power_supply_get_by_name("pc_port");
+    }
     spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
 
+    if (VBATT_IS_ANY == pwrl->vbatt) {
+        pwrl->portable = 1;
+    }
     if (pwrl->portable) {
         if (!pwrl->bms_psy) {
             pr_notice("bms power supply not ready %lld\n", ktime_to_ms(ktime_get()));
@@ -262,7 +296,10 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
             err = strncmp(prop.strval, "c801_scap_4v2_135mah_30k", strlen("c801_scap_4v2_135mah_30k"));
             /*pwrl->cradle_attached = */pwrl->batt_is_scap = (0 == err);
         }
-        if (0 == pwrl->batt_is_scap) {
+        if (VBATT_IS_ANY == pwrl->vbatt) {
+            pwrl->portable = 0;
+        }
+        if (pwrl->portable && 0 == pwrl->batt_is_scap) {
             enable_irq_safe(pwrl->pwr_lost_irq, 0);
             return;
         }
@@ -272,36 +309,70 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
         spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags);
         pwrl->pwr_lost_wan_d = pwrl->pwr_lost_wlan_d = pwrl->pwr_lost_off_d = -1;
         spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
-        enable_irq_safe(pwrl->pwr_lost_irq, 1);
+        if (pwrl->pwr_lost_pin_l == val && pwrl->vbatt > -1) {
+            spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags); 
+            pwrl->pwr_lost_timer = ktime_to_ms(ktime_get());
+            spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
+        } else {
+            if (pwrl->vbatt < 0) {
+                enable_irq_safe(pwrl->pwr_lost_irq, 1);
 
-        return;
+                return;
+            }
+        }
     }
 
-    if ((pwrl->pwr_lost_pin_l != val) || (usb_online && (0 == pwrl->cradle_attached)) || (pwrl->pwr_lost_off_cd < 0)) {
+    if ((pwrl->pwr_lost_pin_l != val) || (usb_online && (0 == pwrl->cradle_attached || 0x41 == pwrl->cradle_attached)) ||
+        (pwrl->pwr_lost_off_cd < 0)) {
         enable_irq_safe(pwrl->pwr_lost_irq, 0);
         spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags);
         pwrl->pwr_lost_wan_d = pwrl->pwr_lost_wlan_d = pwrl->pwr_lost_off_d = -1;
         spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
         pr_notice("input power restored or usb charger attached %lld\n", timer);
+        if (pwrl->vbatt > -1) {
+            pwrl->vbatt = VBATT_IS_DCDC;
+            if (gpio_is_valid(pwrl->pwr_lost_batt_chg_pin)) {
+                pr_notice("allow BATTERY_CHARGE\n");
+                gpio_set_value(pwrl->pwr_lost_batt_chg_pin, !pwrl->pwr_lost_batt_chg_l);
+            }
+            if (pwrl->main_psy) {
+                prop.intval = 1;
+                pr_notice("plug main power supply\n");
+                power_supply_set_property(pwrl->main_psy, POWER_SUPPLY_PROP_PRESENT, &prop);
+            }
+            if (pwrl->usb_psy) {
+                pr_notice("restore high current supplier %lld\n", timer); 
+                prop.intval = 900 * 1000; 
+                power_supply_set_property(pwrl->usb_psy, POWER_SUPPLY_PROP_SDP_CURRENT_MAX, &prop);
+            }
+            if (pwrl->otg_psy) {
+                prop.intval = POWER_SUPPLY_SCOPE_DEVICE;
+                pr_notice("allow ufp\n");
+                power_supply_set_property(pwrl->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
+            }
+            if (pwrl->bat_psy) {
+                prop.intval = 0;
+                pr_notice("resume charging\n");
+                power_supply_set_property(pwrl->bat_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
+            }
+        }
+
         for (val = num_possible_cpus() - 1; val > 0; val--) {
             if (cpu_online(val))
                 continue;
 #if defined (CONFIG_SMP)
-            pr_notice("voting for cpu%d up", val);
             err = cpu_up(val);
-            if (err && err == notifier_to_errno(NOTIFY_BAD))
-                pr_notice(" is declined\n");
-            else if (err)
-                pr_err(" failure. err:%d\n", err);
-            else
-                pr_notice("\n");
+            pr_notice("voting for cpu%d up%s %d\n", val,
+                      (err == notifier_to_errno(NOTIFY_BAD))?" is declined":(err)?" is failure":" ", err);
 #endif
         }
         adreno_suspend(pwrl, 0);
         wcnss_suspend(pwrl, 0);
         power_loss_notify(pwrl, 0, 0);
         enable_irq_safe(pwrl->pwr_lost_irq, 1);
-        __pm_relax(&pwrl->wlock.ws);
+        if (pwrl->pwr_lost_timer > 0) {
+            __pm_relax(&pwrl->wlock.ws);
+        }
 
         return;
     } else if (-1 == pwrl->pwr_lost_off_d) {
@@ -315,6 +386,33 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
             pwrl->pwr_lost_off_d = pwrl->pwr_lost_wlan_d + 100;
         }
         pr_notice("input power lost %lld\n", timer);
+        if (pwrl->vbatt > -1) {
+            pwrl->vbatt = VBATT_IS_BATTERY;
+            if (pwrl->usb_psy) {
+                pr_notice("limit standard current supplier %lld\n", timer); 
+                prop.intval = 500 * 1000; 
+                power_supply_set_property(pwrl->usb_psy, POWER_SUPPLY_PROP_SDP_CURRENT_MAX, &prop);
+            }
+            if (pwrl->otg_psy) {
+                prop.intval = POWER_SUPPLY_SCOPE_UNKNOWN;
+                pr_notice("cancel ufp\n");
+                power_supply_set_property(pwrl->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
+            }
+            if (pwrl->bat_psy) {
+                prop.intval = 1;
+                pr_notice("suspend charging\n");
+                power_supply_set_property(pwrl->bat_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
+            }
+            if (pwrl->main_psy) {
+                prop.intval = 0;
+                pr_notice("unplug main power supply\n");
+                power_supply_set_property(pwrl->main_psy, POWER_SUPPLY_PROP_PRESENT, &prop);
+            }
+            if (gpio_is_valid(pwrl->pwr_lost_batt_chg_pin)) {
+                pr_notice("disallow BATTERY_CHARGE\n");
+                gpio_set_value(pwrl->pwr_lost_batt_chg_pin, pwrl->pwr_lost_batt_chg_l);
+            }
+        }
         pr_notice("shutdown display not implemented yet %lld\n", ktime_to_ms(ktime_get()));
         power_loss_notify(pwrl, 1, 0);
         pr_notice("shudown adreno %lld\n", ktime_to_ms(ktime_get()));
@@ -325,12 +423,8 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
             if (!cpu_online(val))
                 continue;
 #if defined (CONFIG_SMP)
-            pr_notice("voting for cpu%d down", val);
             err = cpu_down(val);
-            if (err)
-                pr_err(" is failure [%d]\n", err);
-            else
-                pr_notice( "\n");
+            pr_notice("voting for cpu%d down%s %d\n", val, (err)?" is failure":" ", err);
 #endif
         }
         timer = (pwrl->pwr_lost_wan_d > ktime_to_ms(ktime_get()))?pwrl->pwr_lost_wan_d - ktime_to_ms(ktime_get()):0;
@@ -426,6 +520,10 @@ static int __ref pwr_loss_cradle_callback(struct notifier_block *nfb, unsigned l
 
     pwrl->cradle_attached = r;
     pr_notice("cradle state %d\n", pwrl->cradle_attached);
+    if (pwrl->vbatt > -1) {
+        cancel_delayed_work(&pwrl->pwr_lost_work); 
+        schedule_delayed_work(&pwrl->pwr_lost_work, msecs_to_jiffies(100)); 
+    }
 
 	return NOTIFY_OK;
 }
@@ -436,8 +534,8 @@ static int __ref pwr_loss_vbus_callback(struct notifier_block *nfb, unsigned lon
 
     pr_notice("vbus state %ld[%d]\n", r, pwrl->cradle_attached);
 
-    if (!pwrl->cradle_attached) {
-        enable_irq_safe(pwrl->pwr_lost_irq, 0); 
+    if (!pwrl->cradle_attached || 0x41 == pwrl->cradle_attached) {
+        enable_irq_safe(pwrl->pwr_lost_irq, 0);
 
         cancel_delayed_work(&pwrl->pwr_lost_work);
 
@@ -499,6 +597,11 @@ static ssize_t pwr_loss_mon_in_show(struct device *dev, struct device_attribute 
         pwrl->usb_psy = power_supply_get_by_name("usb");
     }
 
+    if (!pwrl->bms_psy) {
+        pr_notice("bms power supply not ready %lld\n", ktime_to_ms(ktime_get()));
+        pwrl->bms_psy = power_supply_get_by_name("bms");
+    }
+
     if (pwrl->usb_psy) {
         pwrl->usb_psy->desc->get_property(pwrl->usb_psy, POWER_SUPPLY_PROP_PRESENT, &prop);
         usb_online = prop.intval;
@@ -508,7 +611,7 @@ static ssize_t pwr_loss_mon_in_show(struct device *dev, struct device_attribute 
         val = gpio_get_value(pwrl->pwr_lost_pin);
     }
 
-    if (0 != pwrl->bms_psy->desc->get_property(pwrl->bms_psy, POWER_SUPPLY_PROP_BATTERY_TYPE, &prop) || !prop.strval) {
+    if (!pwrl->bms_psy || 0 != pwrl->bms_psy->desc->get_property(pwrl->bms_psy, POWER_SUPPLY_PROP_BATTERY_TYPE, &prop) || !prop.strval) {
         prop.strval = "unknown";
     }
 
@@ -608,6 +711,111 @@ static ssize_t pwr_loss_mon_wland_store(struct device *dev, struct device_attrib
     return count;
 }
 
+static ssize_t pwr_loss_mon_batt_v_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
+    struct qpnp_vadc_result vadc_res;
+    int vol = 0;
+
+    if (!pwrl->vadc) {
+        pwrl->vadc = qpnp_get_vadc(pwrl->hmd, "mpp2_adc"); 
+    }
+	if(!pwrl->vadc) {
+		return sprintf(buf, "vadc for ignition_v channel not available\n");
+    }
+
+	if (qpnp_vadc_read(pwrl->vadc, pwrl->batt_v_c, &vadc_res)) {
+        return sprintf(buf, "failure to retrieve vadc ignition_v channel\n");
+	}
+	vol = vadc_res.physical/1000;
+	vol *= 312;
+    vol /= 100;
+
+	return sprintf(buf, "%d mV\n", vol);
+}
+
+static ssize_t pwr_loss_mon_batt_v_den_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    int val;
+    struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
+
+    if (!pwrl->sys_ready) {
+        return -EINVAL;
+    }
+
+    if (kstrtos32(buf, 10, &val)) 
+        return -EINVAL;
+
+    spin_lock_irqsave(&pwrl->pwr_lost_lock, pwrl->lock_flags);
+    pwrl->batt_v_den = val;
+    spin_unlock_irqrestore(&pwrl->pwr_lost_lock, pwrl->lock_flags);
+
+    return count;
+}
+
+static ssize_t pwr_loss_mon_batt_v_den_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct power_loss_monitor *pwrl = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%s\n", (pwrl->batt_v_den)?"enabled":"disabled");
+}
+
+static void __ref pwr_lost_bat_v_mon_work(struct work_struct *work)
+{
+    static int vol = 0, usb_online = 0;
+    int val = 0, prev_vol = 0;
+	struct power_loss_monitor *pwrl = container_of(work, struct power_loss_monitor, pwr_lost_bat_v_work.work);
+    struct qpnp_vadc_result vadc_res;
+    union power_supply_propval prop = {0,};
+
+    if (!pwrl->usb_psy) {
+        pr_notice("usb power supply not ready %lld\n", ktime_to_ms(ktime_get()));
+        pwrl->usb_psy = power_supply_get_by_name("usb");
+    }
+    if (pwrl->usb_psy) {
+        pwrl->usb_psy->desc->get_property(pwrl->usb_psy, POWER_SUPPLY_PROP_PRESENT, &prop);
+    } else {
+        prop.intval = 0;
+    }
+
+    if (!pwrl->vadc) {
+        pwrl->vadc = qpnp_get_vadc(pwrl->hmd, "mpp2_adc"); 
+    }
+
+    if(pwrl->vadc) {
+        if (0 == qpnp_vadc_read(pwrl->vadc, pwrl->batt_v_c, &vadc_res)) {
+            val = vadc_res.physical/1000;
+            val *= 312;
+            val /= 100;
+
+            prev_vol = vol;
+            if (val > vol && val - vol > 100) {
+                vol = val;
+            } else if (val <= vol && vol - val > 100) {
+                vol = val;
+            }
+
+            if ((prev_vol < 3200 && vol > 3200) || (prev_vol > 4100 && vol < 4100) || usb_online != prop.intval) {
+                /*changed and batt_v in range 3.1 4.2*/
+                usb_online = prop.intval;
+                schedule_delayed_work(&pwrl->pwr_lost_work, 0);
+            }
+
+            if (gpio_is_valid(pwrl->pwr_lost_batt_empty_pin)) {
+                val = gpio_get_value(pwrl->pwr_lost_batt_empty_pin);
+            } else {
+                val = 0;
+            }
+
+            if (pwrl->batt_v_den) {
+                pr_notice("%d mV [%d], %lld\n", vol, val, ktime_to_ms(ktime_get()));
+            }
+        }
+    }
+
+    schedule_delayed_work(&pwrl->pwr_lost_bat_v_work, msecs_to_jiffies(30000));
+}
+
 static int pwr_loss_mon_probe(struct platform_device *pdev)
 {
 	int err, val;
@@ -632,6 +840,8 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
     pwrl->sys_ready = 0;
 
     pwrl->batt_is_scap = -1;
+    pwrl->vbatt = -1;
+
     c = of_get_property(np, "compatible", 0);
     if (c) {
         pr_err("node is found\n");
@@ -641,6 +851,10 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
         pwrl->portable = 1;
     } else {
         pwrl->portable = 0;
+    }
+
+    if (c && 0 == strncmp("mcn,pwr-loss-mon-sb", c, sizeof("mcn,pwr-loss-mon-sb") - sizeof(char))) {
+        pwrl->vbatt = VBATT_IS_ANY;
     }
 
     spin_lock_init(&pwrl->pwr_lost_lock);
@@ -716,6 +930,7 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
     cradle_register_notifier(&pwrl->pwr_loss_mon_cradle_notifier);
     pwrl->pwr_lost_irq = -1;
     pwrl->pwr_lost_pin = -1;
+    pwrl->bms_psy = 0;
 
     do {
         pwrl->pctl = devm_pinctrl_get(dev);
@@ -760,8 +975,6 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
         pwrl->pwr_lost_pin_l = !pwrl->pwr_lost_pin_l;
         pr_notice("power loss indicator %d\n", pwrl->pwr_lost_pin);
         pr_notice("power loss active level %s\n", (pwrl->pwr_lost_pin_l)?"high":"low");
-
-
 
         pwrl->hmd = hwmon_device_register(dev);
     	if (IS_ERR(pwrl->hmd)) {
@@ -841,8 +1054,87 @@ static int pwr_loss_mon_probe(struct platform_device *pdev)
 
 		pwrl->pwr_lost_timer = -1;
 
-        schedule_delayed_work(&pwrl->pwr_lost_work, (pwrl->pwr_lost_off_cd > 0)?msecs_to_jiffies(pwrl->pwr_lost_off_cd): 0);
+        schedule_delayed_work(&pwrl->pwr_lost_work, (pwrl->pwr_lost_off_cd > 0)?msecs_to_jiffies(pwrl->pwr_lost_off_cd/10): 0);
         power_ok_register_notifier(&pwrl->pwr_loss_mon_vbus_notifier);
+
+        if (pwrl->vbatt > -1) {
+            val = of_get_named_gpio_flags(np, "mcn,pwr-batt-empty", 0, (enum of_gpio_flags *)&pwrl->pwr_lost_batt_empty_l);
+            if (!gpio_is_valid(val)) {
+                pr_err("ivalid batt empty detect pin\n");
+                //err = -EINVAL;
+                //break;
+                pwrl->pwr_lost_batt_empty_pin = -1;
+                pwrl->pwr_lost_batt_empty_l = -1;
+            } else {
+                pwrl->pwr_lost_batt_empty_pin = val;
+            }
+            pwrl->pwr_lost_batt_empty_l = !pwrl->pwr_lost_batt_empty_l;
+            if (gpio_is_valid(pwrl->pwr_lost_batt_empty_pin)) {
+                err = devm_gpio_request(dev, pwrl->pwr_lost_batt_empty_pin, "battery-empty-state");
+                if (err < 0) {
+                    pr_err("failure to request the gpio[%d]\n", pwrl->pwr_lost_batt_empty_pin);
+                } else {
+                    err = gpio_direction_input(pwrl->pwr_lost_batt_empty_pin);
+                    if (err < 0) {
+                        pr_err("failure to set direction of the gpio[%d]\n", pwrl->pwr_lost_batt_empty_pin);
+                    } else {
+                        gpio_export(pwrl->pwr_lost_batt_empty_pin, 0);
+                    }
+                }
+            }
+
+            val = of_get_named_gpio_flags(np, "mcn,pwr-batt-chg", 0, (enum of_gpio_flags *)&pwrl->pwr_lost_batt_chg_l);
+            if (!gpio_is_valid(val)) {
+                pr_err("ivalid batt batt chg en pin\n");
+                //err = -EINVAL;
+                //break;
+                pwrl->pwr_lost_batt_chg_pin = -1;
+                pwrl->pwr_lost_batt_chg_l = -1;
+            } else {
+                pwrl->pwr_lost_batt_chg_pin = val;
+            }
+            pwrl->pwr_lost_batt_chg_l = !pwrl->pwr_lost_batt_chg_l;
+            if (gpio_is_valid(pwrl->pwr_lost_batt_chg_pin)) {
+                err = devm_gpio_request(dev, pwrl->pwr_lost_batt_chg_pin, "battery-chg-en");
+                if (err < 0) {
+                    pr_err("failure to request the gpio[%d]\n", pwrl->pwr_lost_batt_chg_pin);
+                } else {
+                    err = gpio_direction_output(pwrl->pwr_lost_batt_chg_pin, pwrl->pwr_lost_batt_chg_l);
+                    if (err < 0) {
+                        pr_err("failure to set direction of the gpio[%d]\n", pwrl->pwr_lost_batt_chg_pin);
+                    } else {
+                        gpio_export(pwrl->pwr_lost_batt_chg_pin, 0);
+                    }
+                }
+            }
+
+            err = of_property_read_u32(np, "mcn,batt-v-channel", &val); 
+            if (err < 0) {
+                val = 0x21;
+            }
+            pwrl->batt_v_c = val;
+            pwrl->vadc = qpnp_get_vadc(pwrl->hmd, "mpp2_adc"); 
+
+            snprintf(pwrl->attr_batt_v.name, sizeof(pwrl->attr_batt_v.name) - 1, "batt_v"); 
+            pwrl->attr_batt_v.attr.attr.name = pwrl->attr_batt_v.name;
+            pwrl->attr_batt_v.attr.attr.mode = 0444;
+            pwrl->attr_batt_v.attr.show = pwr_loss_mon_batt_v_show;
+            pwrl->attr_batt_v.attr.store = 0;
+            sysfs_attr_init(&pwrl->attr_batt_v.attr.attr);
+            err = device_create_file(pwrl->hmd, &pwrl->attr_batt_v.attr);
+
+            pwrl->batt_v_den = 0;
+            snprintf(pwrl->attr_batt_v_den.name, sizeof(pwrl->attr_batt_v_den.name) - 1, "batt_v_den"); 
+            pwrl->attr_batt_v_den.attr.attr.name = pwrl->attr_batt_v_den.name;
+            pwrl->attr_batt_v_den.attr.attr.mode = 0666;
+            pwrl->attr_batt_v_den.attr.show = pwr_loss_mon_batt_v_den_show;
+            pwrl->attr_batt_v_den.attr.store = pwr_loss_mon_batt_v_den_store;
+            sysfs_attr_init(&pwrl->attr_batt_v_den.attr.attr);
+            err = device_create_file(pwrl->hmd, &pwrl->attr_batt_v_den.attr);
+
+            INIT_DELAYED_WORK(&pwrl->pwr_lost_bat_v_work, pwr_lost_bat_v_mon_work);
+            schedule_delayed_work(&pwrl->pwr_lost_bat_v_work, (pwrl->pwr_lost_off_cd > 0)?msecs_to_jiffies(pwrl->pwr_lost_off_cd/5): msecs_to_jiffies(2000));
+        }
 
         pwrl->sys_ready = 1;
 
@@ -936,6 +1228,9 @@ static int pwr_loss_mon_remove(struct platform_device *pdev)
 	struct power_loss_monitor *pwrl = platform_get_drvdata(pdev);
 
     cancel_delayed_work(&pwrl->pwr_lost_work);
+    if (pwrl->vbatt > -1) {
+        cancel_delayed_work(&pwrl->pwr_lost_bat_v_work);
+    }
     enable_irq_safe(pwrl->pwr_lost_irq, 0);
 
 	wakeup_source_trash(&pwrl->wlock.ws);
@@ -960,6 +1255,12 @@ static int pwr_loss_mon_remove(struct platform_device *pdev)
 		devm_gpio_free(&pdev->dev, pwrl->pwr_lost_pin);
     dev_set_drvdata(&pdev->dev, 0);
 
+    if(gpio_is_valid(pwrl->pwr_lost_batt_empty_pin))
+        devm_gpio_free(&pdev->dev, pwrl->pwr_lost_batt_empty_pin);
+
+    if(gpio_is_valid(pwrl->pwr_lost_batt_chg_pin))
+        devm_gpio_free(&pdev->dev, pwrl->pwr_lost_batt_chg_pin);
+
 	devm_kfree(&pdev->dev, pwrl);
 
 	return 0;
@@ -971,6 +1272,7 @@ static void pwr_loss_mon_shutdown(struct platform_device *pdev) {
 
 static const struct of_device_id of_pwr_loss_mon_match[] = {
 	{ .compatible = "mcn,pwr-loss-mon", },
+    { .compatible = "mcn,pwr-loss-mon-sb", },
     { .compatible = "mcn,pwr-loss-mon-scap", },
 	{},
 };

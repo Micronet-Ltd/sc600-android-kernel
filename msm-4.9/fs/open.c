@@ -1063,7 +1063,10 @@ long do_sys_open(int dfd, const char __user *filename, int flags, umode_t mode)
 	if (fd)
 		return fd;
 
-	tmp = getname(filename);
+//    if (filename && strstr(filename, "cache")) {
+//        pr_notice("%s: [%s], %lld\n", __func__, filename, ktime_to_ms(ktime_get()));
+//    }
+    tmp = getname(filename); 
 	if (IS_ERR(tmp))
 		return PTR_ERR(tmp);
 

@@ -1219,6 +1219,13 @@ config BUILD_ARM64_DT_OVERLAY
 	depends on OF
 	help
 	  This option enables support for DT overlay compilation.
+
+config BOARD_VARIANT_SB
+    depends on ARCH_MSM8953
+    bool "BOARD_VARIANT_SB version"
+    help
+      Fix version type as BOARD_VARIANT_SB.
+
 endmenu
 
 menu "Userspace binary formats"

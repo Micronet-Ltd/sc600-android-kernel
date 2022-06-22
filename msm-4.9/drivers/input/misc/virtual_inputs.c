@@ -8,6 +8,9 @@
 #include <linux/notifier.h>
 #include <linux/gpio.h>
 #include <linux/of.h>
+#include <linux/of_platform.h>
+#include <linux/of_gpio.h>
+#include <linux/interrupt.h>
 
 #include <linux/syscalls.h>
 #include <linux/file.h>
@@ -28,7 +31,12 @@ extern int cradle_register_notifier(struct notifier_block *nb);
 struct gpio_set {
 	int base;
 	int ngpio;
+    int ain[2];
+    int ain_l[2];
+    int ain_irq[2];
+    int ain_irq_mask;
 };
+
 struct work_params {
 	int reason;
 	int args;
@@ -65,12 +73,14 @@ struct virt_inputs {
     struct  delayed_work    virtual_input_init_work;
     struct  notifier_block  virtual_inputs_cradle_notifier;
 	struct 	work_params     wparams; 
-	struct 	vinput_key*     vmap;
+	struct 	vinput_key      *vmap;
 	struct	gpio_set 	    gpios_in;
 	struct 	notifier_block  notifier;
 	int		                reinit;
     int                     cradle_attached;
+    int                     tlmm_based;
     struct mutex lock;
+    struct pinctrl          *pctl;
 };
 
 static struct virt_inputs* vdev;
@@ -97,7 +107,18 @@ static int vinputs_get_gpios(int f_update)
 	int num = vdev->gpios_in.base;
 	int qty = min_t(size_t, (vdev->gpios_in.ngpio), (ARRAY_SIZE(vinputs)));
 
-	if(!is_gpios_exists(&vdev->gpios_in)) {
+    if (vdev->tlmm_based) {
+        if (gpio_is_valid(vdev->gpios_in.ain[0])) {
+            val |= (vdev->gpios_in.ain_l[0] == gpio_get_value(vdev->gpios_in.ain[0]));
+        }
+        if (gpio_is_valid(vdev->gpios_in.ain[1])) {
+            val |= (vdev->gpios_in.ain_l[1] == gpio_get_value(vdev->gpios_in.ain[1])) << 1;
+        }
+
+        return val;
+    }
+
+    if (!is_gpios_exists(&vdev->gpios_in)) {
 		return -1;
 	}
 
@@ -112,8 +133,7 @@ static int vinputs_get_gpios(int f_update)
 			if (f_update) {
 				vdev->vmap[i].val = v;
 			}
-		}
-		else {
+		} else {
 			val |= (vdev->vmap[i].val << i);//don't change
 			pr_err("%s: gpio_request failed err %d\n", __func__, err);
 		}
@@ -133,6 +153,7 @@ static int vinputs_get_val(void)
 	}
 	return val;
 }
+
 static ssize_t show_in_all(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	int val = vinputs_get_val();
@@ -152,6 +173,7 @@ static ssize_t show_in(struct device *dev, struct device_attribute *attr, char *
 	pr_notice("%s: %d\n", __func__, vdev->vmap[ix].code);
 	return sprintf(buf, "%d\n", vdev->vmap[ix].val);
 }
+
 static SENSOR_DEVICE_ATTR(in0_input, S_IRUGO, show_in, NULL, 0);
 static SENSOR_DEVICE_ATTR(in1_input, S_IRUGO, show_in, NULL, 1);
 static SENSOR_DEVICE_ATTR(in2_input, S_IRUGO, show_in, NULL, 2);
@@ -180,9 +202,44 @@ static const struct attribute_group in_attr_group = {
 	.attrs = in_attributes
 };
 
+static irqreturn_t ain_irq_handler(int irq, void *arg)
+{
+	struct virt_inputs *vinp = (struct virt_inputs *)arg;
+    struct irq_desc *irq_desc;
+    int i;
+
+    for (i = 0; i < 2; i++) {
+        if ( vinp->gpios_in.ain_irq[i] == irq ) {
+            irq_desc = irq_to_desc(irq);
+            if (irq_desc) {
+                if (irq_desc->irq_data.chip->irq_mask) {
+                    irq_desc->irq_data.chip->irq_mask(&irq_desc->irq_data);
+                    pr_notice("%s: mask irq[%d]\n", __func__, irq);
+                }
+                if (irq_desc->irq_data.chip->irq_ack) {
+                    irq_desc->irq_data.chip->irq_ack(&irq_desc->irq_data);
+                    pr_notice("%s: ack irq[%d]\n", __func__, irq);
+                }
+            }
+
+            disable_irq_nosync(irq);
+            vinp->gpios_in.ain_irq_mask |= (1 << i);
+
+            break;
+        }
+    }
+
+    schedule_work(&vinp->work); 
+
+	return IRQ_HANDLED;
+}
+
 static void vinputs_work_func(struct work_struct *work) 
 {
 	struct virt_inputs *vinp  = container_of(work, struct virt_inputs, work);
+    struct device_node *np;
+    struct irq_desc *desc;
+    struct irq_desc *irq_desc;
 	unsigned long val = -1;
 	int i, v, sync = 0;
 	int qty = min_t(size_t, (vinp->gpios_in.ngpio), (ARRAY_SIZE(vinputs)));
@@ -191,13 +248,101 @@ static void vinputs_work_func(struct work_struct *work)
 		pr_notice("%s: init\n", __func__);
 
         mutex_lock(&vinp->lock);
-		val = vinputs_init_files();
+        if (vinp->tlmm_based) {
+            vinp->gpios_in.base = 0;
+            vinp->gpios_in.ngpio = 0;
+            np = of_find_compatible_node(NULL, NULL, "mcn,tlmm-based-vinputs");
+            if (np) {
+                val = of_get_named_gpio_flags(np, "mcn,ain-0", 0, (enum of_gpio_flags *)&v);
+                if (gpio_is_valid(val)) {
+                    vinp->gpios_in.ngpio++;
+                    vinp->gpios_in.ain[0] = val;
+                    vinp->gpios_in.ain_l[0] = !v;
+                } else {
+                    vinp->gpios_in.ain[0] = -1;
+                    vinp->gpios_in.ain_l[0] = -1;
+                }
+
+                if (gpio_is_valid(vinp->gpios_in.ain[0])) {
+                    val = devm_gpio_request(vinp->mdev->this_device, vinp->gpios_in.ain[0], "ain-0-state");
+                    if (val >= 0) {
+                        val = gpio_direction_input(vinp->gpios_in.ain[0]);
+                        if (val >= 0) {
+                            gpio_export(vinp->gpios_in.ain[0], 1);
+
+                            vinp->gpios_in.ain_irq[0] = gpio_to_irq(vinp->gpios_in.ain[0]);
+                            if (vinp->gpios_in.ain_irq[0] < 0) {
+                                dev_err(vinp->mdev->this_device, "failure to request gpio[%d] irq\n", vinp->gpios_in.ain[0]);
+                            } else {
+                                val = devm_request_irq(vinp->mdev->this_device, vinp->gpios_in.ain_irq[0], ain_irq_handler,
+                                                       IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+                                                       vinp->mdev->name, vinp);
+                                if (!val) {
+                                    disable_irq_nosync(vinp->gpios_in.ain_irq[0]);
+                                } else {
+                                    dev_err(vinp->mdev->this_device, "failure to request irq[%d] irq -- polling available\n",
+                                            vinp->gpios_in.ain_irq[0]);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                val = of_get_named_gpio_flags(np, "mcn,ain-1", 0, (enum of_gpio_flags *)&v);
+                if (gpio_is_valid(val)) {
+                    vinp->gpios_in.ngpio++;
+                    vinp->gpios_in.ain[1] = val;
+                    vinp->gpios_in.ain_l[1] = !v;
+                } else {
+                    vinp->gpios_in.ain[1] = -1;
+                    vinp->gpios_in.ain_l[1] = -1;
+                }
+
+                if (gpio_is_valid(vinp->gpios_in.ain[1])) {
+                    val = devm_gpio_request(vinp->mdev->this_device, vinp->gpios_in.ain[1], "ain-1-state");
+                    if (val >= 0) {
+                        val = gpio_direction_input(vinp->gpios_in.ain[1]);
+                        if (val >= 0) {
+                            gpio_export(vinp->gpios_in.ain[1], 1);
+
+                            vinp->gpios_in.ain_irq[1] = gpio_to_irq(vinp->gpios_in.ain[1]);
+                            if (vinp->gpios_in.ain_irq[1] < 0) {
+                                dev_err(vinp->mdev->this_device, "failure to request gpio[%d] irq\n", vinp->gpios_in.ain[1]);
+                            } else {
+                                val = devm_request_irq(vinp->mdev->this_device, vinp->gpios_in.ain_irq[1], ain_irq_handler,
+                                                       IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+                                                       vinp->mdev->name, vinp);
+                                if (!val) {
+                                    disable_irq_nosync(vinp->gpios_in.ain_irq[1]);
+                                } else {
+                                    dev_err(vinp->mdev->this_device, "failure to request irq[%d] irq -- polling available\n",
+                                            vinp->gpios_in.ain_irq[1]);
+                                }
+                            }
+                        }
+                    }
+                }
+                of_node_put(np);
+            }
+
+            qty = vinp->gpios_in.ngpio;
+
+            if (vinp->gpios_in.ngpio > 0) {
+                vinp->gpios_in.ain_irq_mask = 3;
+                val = 0;
+            } else {
+                val = -1;
+            }
+        } else {
+            val = vinputs_init_files();
+        }
         if (0 == val) {
             vinp->reinit = 0; 
             pr_notice("%s: succeed\n", __func__);
         }
         mutex_unlock(&vinp->lock);
 	}
+
     if (vinp->reinit) {
         pr_notice("%s: failure\n", __func__);
         schedule_work(&vinp->work);
@@ -223,6 +368,27 @@ static void vinputs_work_func(struct work_struct *work)
 		input_sync(vinp->input_dev);
         pr_notice("%s input synced\n", __func__);
 	}
+
+    if (vinp->tlmm_based) {
+        for (i = 0; i < 2; i++) {
+            if (vinp->gpios_in.ain_irq_mask & (1 << i)) {
+                vinp->gpios_in.ain_irq_mask &= ~(1 << i);
+                desc = irq_to_desc(vinp->gpios_in.ain_irq[i]);
+                irq_desc = irq_to_desc(vinp->gpios_in.ain_irq[i]);
+                if(desc->depth > 0) {
+                    enable_irq(vinp->gpios_in.ain_irq[i]);
+                    if (irq_desc) {
+                        if (irq_desc && irq_desc->irq_data.chip->irq_ack) {
+                            irq_desc->irq_data.chip->irq_ack(&irq_desc->irq_data);
+                        }
+                        if (irq_desc->irq_data.chip->irq_unmask) {
+                            irq_desc->irq_data.chip->irq_unmask(&irq_desc->irq_data);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 static void cradle_is_connected_work_fix(struct work_struct *work){
@@ -366,202 +532,17 @@ static int vinputs_open(struct inode *inode, struct file *file)
 	file->private_data = vdev;
 	return 0;
 }
+
 static int vinputs_release(struct inode *inode, struct file *file)
 {
-//	struct virt_inputs* dev = file->private_data;
-
 	return 0;
 }
-///test!!!!!!
-/*
-#define BUF_SIZE 1024
-static int get_val_from_file(const char* fname)
-{
-	int fd, val = -1;
-	char txt[4] = {0};
 
-	fd = sys_open(fname, O_RDONLY, 0);
-	if (fd > 0) {
-		sys_read(fd, txt, 4);
-		sys_close(fd);
-
-		val = simple_strtoul(txt, 0, 10);
-	}
-	return val;
-}
-static int find_gname(void* buf, const char* in_dir, const char* cmp_str, struct gpio_set *set)
-{
-	int fd, fdf;
-	struct linux_dirent64 *dirp;
-	mm_segment_t old_fs;
-	int num;
-	char txt[128] = {0};
-	const char* fname = "label";
-
-	if (!in_dir || !fname || !cmp_str || (strlen(cmp_str) > sizeof(txt)) ) {
-		pr_err("%s:bad params\n", __func__);
-		//sprintf(dbg_buf, "%s:bad params\n", __func__);
-		return -1;
-	}
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-
-	pr_notice("%s:+\n", __func__);
-
-	fd = sys_open(in_dir, O_RDONLY, 0); 
-
-	if (fd < 0) {
-		pr_err("%s:error open ret %d\n", __func__, fd);
-		//sprintf(dbg_buf, "%s:error open ret %d\n", __func__, fd);
-		set_fs(old_fs);
-		return -1;
-	}
-	dirp = (struct linux_dirent64 *)buf;
-	num = sys_getdents64(fd, dirp, BUF_SIZE);
-	while (num > 0) {
-		while (num > 0) {
-			pr_info("%s: %s\n", __func__, dirp->d_name);
-
-			if(0 == strcmp(dirp->d_name, fname)) {
-				sprintf(txt,"%s/%s", in_dir, fname);
-				fdf = sys_open(txt, O_RDONLY, 0);
-				if (fdf < 0) {
-					pr_err("%s:error open file %s [%d]\n", __func__, txt, fdf);
-					//sprintf(dbg_buf, "%s:error open file %s [%d]\n", __func__, txt, fdf);
-					//try next;
-				}
-				else {
-					memset(txt, 0, sizeof(txt));
-					sys_read(fdf, txt, strlen(cmp_str));
-					sys_close(fdf);
-
-					if (0 == strcmp(txt, cmp_str)) {
-
-						sprintf(txt,"%s/%s", in_dir, "base");
-						set->base = get_val_from_file(txt);
-
-						sprintf(txt,"%s/%s", in_dir, "ngpio");
-						set->ngpio = get_val_from_file(txt);
-						num = 0;
-						break;
-					}
-				}
-			}
-
-			num -= dirp->d_reclen;
-			dirp = (void *)dirp + dirp->d_reclen;
-		}
-
-		dirp = buf;
-		memset(buf, 0, BUF_SIZE);
-		num = sys_getdents64(fd, dirp, BUF_SIZE);
-	}
-	pr_notice("%s: -\n", __func__);
-
-	sys_close(fd);
-	set_fs(old_fs);
-
-	return set->ngpio;
-}
-int find_gpios(const char* find_name, struct gpio_set* gset)
-{
-	int fd;
-	void *buf;
-	struct linux_dirent64 *dirp;
-	mm_segment_t old_fs;
-	int num;
-	const char* start_dir = "/sys/class/gpio/";
-	const char* chip_str = "gpiochip";
-
-	char dir_chip[64] = {0};
-
-	memset(gset, 0, sizeof(struct gpio_set));
-
-	buf = kzalloc(BUF_SIZE * 2, GFP_KERNEL);
-	if (!buf) {
-		pr_err("%s:kzalloc faile\n", __func__);
-		//sprintf(dbg_buf, "%s:kzalloc faile\n", __func__);
-		return -ENOMEM;
-	}
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-
-	pr_notice("%s:+\n", __func__);
-
-	fd = sys_open(start_dir, O_RDONLY, 0);
-
-	if (fd < 0) {
-		pr_err("%s:error open ret %d\n", __func__, fd);
-		//sprintf(dbg_buf, "%s:error open ret %d ", __func__, fd);
-
-		fd = sys_open("/sys/", O_RDONLY, 0);
-		if (fd < 0) {
-			pr_err("%s:error open sys ret %d\n", __func__, fd);
-			sprintf(dir_chip, " - sys ret %d", fd);
-			//strcat(dbg_buf, dir_chip);
-		}
-		else
-			sys_close(fd);
-		fd = sys_open("/proc/", O_RDONLY, 0);
-		if (fd < 0) {
-			pr_err("%s:error open /proc ret %d\n", __func__, fd);
-			sprintf(dir_chip, " - /proc ret %d", fd);
-			//strcat(dbg_buf, dir_chip);
-		}
-		else
-			sys_close(fd);
-
-		fd = sys_open("/sys/devices/virtual/gpio/", O_RDONLY, 0);
-		if (fd < 0) {
-			pr_err("%s:error open sys/devices/virtual/gpio/ ret %d\n", __func__, fd);
-			sprintf(dir_chip, " - sys/devices/virtual/gpio/ ret %d\n", fd);
-			//strcat(dbg_buf, dir_chip);
-		}
-		else
-			sys_close(fd);
-		return -1;
-	}
-
-	dirp = (struct linux_dirent64*)buf;
-	num = sys_getdents64(fd, dirp, BUF_SIZE);
-	while (num > 0) {
-		while (num > 0) {
-			pr_notice("%s: %s\n", __func__, dirp->d_name);
-
-			if(0 == strncmp(dirp->d_name, chip_str, strlen(chip_str)) ) {
-
-				sprintf(dir_chip, "%s%s", start_dir, dirp->d_name);
-				if(find_gname(buf + BUF_SIZE, dir_chip, find_name, gset) > 0)
-				{
-					pr_notice("%s: found base %d, num %d\n", __func__, gset->base, gset->ngpio );
-
-					num = 0;//for the next break
-					break;
-				}
-			}
-
-			num -= dirp->d_reclen;
-			dirp = (void *)dirp + dirp->d_reclen;
-		}
-
-		dirp = buf;
-		memset(buf, 0, BUF_SIZE);
-		num = sys_getdents64(fd, dirp, BUF_SIZE);
-	}
-	pr_notice("%s: -\n", __func__);
-
-	sys_close(fd);
-	kfree(buf);
-
-	return gset->ngpio;
-}
-*/
 static int gpiochip_lable_match(struct gpio_chip* chip, void* data)
 {
 	return !strcmp(chip->label, data);
 }
+
 static int find_gpios_by_label(char* find_name, struct gpio_set* gset)
 {
 	struct gpio_chip *chip;
@@ -634,52 +615,106 @@ static int vinputs_create_input_dev(struct virt_inputs* vdev)
 static int __init virtual_inputs_init(void)
 {
 	int error;
-    int fixed_mode = 0;
+    int fixed_mode = 0, tlmm_based = 0;
 	struct device *dev;
     struct device_node *np;
 
     np = of_find_compatible_node(NULL, NULL, "mcn,fixed-vinputs");
     if (np) {
         fixed_mode = 1;
-        pr_err("node is finded\n");
+        pr_notice("vinputs are stm32/k20 based\n");
+    } else {
+        np = of_find_compatible_node(NULL, NULL, "mcn,tlmm-based-vinputs");
+        if (np) {
+            pr_notice("vinputs are tlmm based\n");
+            tlmm_based = 1;
+        }
     }
-	pr_info("%s:+\n", __func__);
+	pr_info("%s:\n", __func__);
 	vdev = kzalloc(sizeof(struct virt_inputs), GFP_KERNEL);
 	if (!vdev)
 		return -ENOMEM;
 
 	vdev->vmap = vinputs;
 	vdev->reinit = 0;
+    vdev->tlmm_based = tlmm_based;
 
-	error = misc_register(&vinputs_dev);
-	if (error) {
-		pr_err("%s: misc_register failed\n", vinputs_dev.name);
-		return -EINVAL;
-	}
-
-    if (fixed_mode) {
-        vdev->virtual_inputs_cradle_notifier.notifier_call = virtual_inputs_cradle_callback;
-        cradle_register_notifier(&vdev->virtual_inputs_cradle_notifier);
+    error = misc_register(&vinputs_dev); 
+    if (error) {
+        pr_err("%s: misc_register failed\n", vinputs_dev.name);
+        return -EINVAL;
     }
+    vdev->mdev = &vinputs_dev;
+    dev = vdev->mdev->this_device;
 
-	vdev->mdev = &vinputs_dev;
-    if(!fixed_mode){
-        vdev->notifier.notifier_call = vinputs_callback;
-        error = gpio_in_register_notifier(&vdev->notifier);
-        if (error) {
-            pr_err("failure to register remount notifier [%d]\n", error);
-            misc_deregister(&vinputs_dev);
-            kfree(vdev);
-            return error;
+    if (vdev->tlmm_based) {
+        struct platform_device *pdev;
+        struct pinctrl_state *pctls;
+
+        pdev = of_find_device_by_node(np);
+        if (pdev) {
+            vdev->pctl = devm_pinctrl_get(&pdev->dev); 
+            if (IS_ERR(vdev->pctl)) {
+                if (PTR_ERR(vdev->pctl) == -EPROBE_DEFER) {
+                    dev_err(dev, "pin ctl critical error!\n");
+                    misc_deregister(&vinputs_dev);
+                    kfree(vdev);
+                    of_node_put(np);
+                    return -EPROBE_DEFER;
+                }
+
+                pr_notice("pin control isn't used\n");
+                vdev->pctl = 0;
+            }
+
+            if (vdev->pctl) {
+                pctls = pinctrl_lookup_state(vdev->pctl, "automotive_inputs_active");
+                if (IS_ERR(pctls)) {
+                    dev_err(dev, "failure to lookup active pinctrl\n");
+                    misc_deregister(&vinputs_dev);
+                    kfree(vdev);
+                    of_node_put(np);
+                    return PTR_ERR(pctls);
+                }
+                error = pinctrl_select_state(vdev->pctl, pctls);
+                if (error) {
+                    dev_err(dev, "failure to set pinctrl active state\n");
+                    misc_deregister(&vinputs_dev);
+                    kfree(vdev);
+                    of_node_put(np);
+                    return error;
+                }
+            }
+        } else {
+            dev_err(dev, "failure to access platform device pinctrl\n");
+        }
+    } else {
+        if (fixed_mode) {
+            vdev->virtual_inputs_cradle_notifier.notifier_call = virtual_inputs_cradle_callback;
+            cradle_register_notifier(&vdev->virtual_inputs_cradle_notifier);
+        }
+
+        if(!fixed_mode){
+            vdev->notifier.notifier_call = vinputs_callback;
+            error = gpio_in_register_notifier(&vdev->notifier);
+            if (error) {
+                pr_err("failure to register remount notifier [%d]\n", error);
+                misc_deregister(&vinputs_dev);
+                kfree(vdev);
+                of_node_put(np);
+                return error;
+            }
         }
     }
+    of_node_put(np);
+
 	error = vinputs_create_input_dev(vdev);
 	if (error) {
 		misc_deregister(&vinputs_dev);
 		kfree(vdev);
 		return error;
 	}
-    dev = vdev->mdev->this_device;
+
     error = sysfs_create_group(&dev->kobj, &in_attr_group);
     if (error) {
         pr_err("%s: could not create sysfs group\n", __func__);
@@ -688,29 +723,43 @@ static int __init virtual_inputs_init(void)
         kfree(vdev);
         return error;
     }
+
     mutex_init(&vdev->lock);
     vdev->reinit = 1;
     if(!fixed_mode){
         INIT_WORK(&vdev->work, vinputs_work_func);
-        //	vinputs_init_files();
         schedule_work(&vdev->work); 
     }else{
         INIT_DELAYED_WORK(&vdev->virtual_input_init_work, cradle_is_connected_work_fix);
         vdev->cradle_attached = 0;
         schedule_delayed_work(&vdev->virtual_input_init_work, 2000);
     }
-    pr_info("%s:-\n", __func__);
+    pr_notice("%s:-\n", __func__);
+
 	return 0;
 }
 
 static void __exit virtual_inputs_exit(void)
 {
 	struct device *dev= vinputs_dev.this_device;
+    int i;
 
     cancel_work_sync(&vdev->work);
 	sysfs_remove_group(&dev->kobj, &in_attr_group);
+    if (vdev->tlmm_based) {
+        for (i = 0; i < vdev->gpios_in.ngpio; i++) {
+            if (gpio_is_valid(vdev->gpios_in.ain[i])) {
+                if (vdev->gpios_in.ain_irq[i]) {
+                    disable_irq_nosync(vdev->gpios_in.ain_irq[i]);
+                    devm_free_irq(vdev->mdev->this_device, vdev->gpios_in.ain_irq[i], vdev);
+                }
+                devm_gpio_free(vdev->mdev->this_device, vdev->gpios_in.ain[i]);
+            }
+        }
+    }
 	input_free_device(vdev->input_dev);
 	misc_deregister(&vinputs_dev);
+
 	kfree(vdev);
 }
 

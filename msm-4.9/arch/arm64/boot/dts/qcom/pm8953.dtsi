@@ -86,7 +86,7 @@
 
 			case_therm {
 				cas_therm_default: cas_therm_default {
-					//pins = "mpp4";
+					/*pins = "mpp4";*/
 					function = "analog";
 					input-enable;
 					qcom,amux-route = <3>;
@@ -258,6 +258,7 @@
 				qcom,fast-avg-setup = <0>;
 				qcom,vadc-thermal-node;
 			};
+
 			chan@13 {
 				label = "case_therm";
 				reg = <0x13>;

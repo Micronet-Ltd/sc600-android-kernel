@@ -789,7 +789,13 @@ static int __init virtual_gpio_init(void)
     np = of_find_compatible_node(NULL, NULL, "mcn,fixed-vinputs");
     if (np) {
         fixed_mode = 1;
-        pr_err("node is finded\n");
+        pr_notice("%s: node is finded\n", __func__);
+    } else {
+        np = of_find_compatible_node(NULL, NULL, "mcn,tlmm-based-vinputs");
+        if (np) {
+            pr_notice("%s: tlmm based vinputs\n", __func__);
+            return 0;
+        }
     }
 
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);

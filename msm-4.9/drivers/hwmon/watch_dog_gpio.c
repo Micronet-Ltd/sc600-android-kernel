@@ -127,14 +127,13 @@ static ssize_t toggle_active_store(struct device *dev, struct device_attribute *
     if (kstrtos32(buf, 10, &val))
         return -EINVAL;
 
-    pr_notice("%d\n", val);
     if (gpio_is_valid(wdi->toggle_pin)) {
         if (val == !wdi->suspend) {
             pr_notice("eq nothing to do\n");
             return count;
         }
 
-        if (0 == wdi->suspend) {
+        if (wdi->portable >= 0 && 0 == wdi->suspend) {
             cancel_delayed_work_sync(&wdi->toggle_work);
         }
 
@@ -142,7 +141,13 @@ static ssize_t toggle_active_store(struct device *dev, struct device_attribute *
         wdi->suspend = !val;
         spin_unlock_irqrestore(&wdi->rfkillpin_lock, wdi->lock_flags);
 
-        schedule_delayed_work(&wdi->toggle_work, 0);	
+        pr_notice("%s -> %d for %d\n", buf, val, wdi->portable);
+        if (wdi->portable >= 0) {
+            schedule_delayed_work(&wdi->toggle_work, 0);
+        } else {
+            gpio_set_value(wdi->toggle_pin, val);
+        }
+
         return count;
     }
 
@@ -282,15 +287,20 @@ static int watchdog_pin_probe(struct platform_device *op)
 		return -ENOMEM;
 	}
 
-
     comp = of_get_property(np, "compatible", NULL);
-    if (comp && 0 == strncmp("mcn,fixed-watchdog-pin", comp, sizeof("mcn,fixed-watchdog-pin") - sizeof(char))) {
-        inf->portable = 0;
+    if (comp) {
+        if (0 == strncmp("mcn,pwr-button-timer-fb", comp, sizeof("mcn,pwr-button-timer-fb") - sizeof(char))) {
+            inf->portable = -1;
+        } else if (0 == strncmp("mcn,fixed-watchdog-pin", comp, sizeof("mcn,fixed-watchdog-pin") - sizeof(char))) {
+            inf->portable = 0;
+        } else {
+            inf->portable = 1;
+        }
     } else {
-        inf->portable = 1;
+        inf->portable = 0;
     }
 
-    pr_notice("TAB8 %s \n", (1 == inf->portable)?"portable":"fixed");
+    dev_notice(dev, "%s: %s \n", (-1 == inf->portable)?"Single board net888":"TAB8", (1 == inf->portable)?"portable":"fixed");
 
     inf->pctl = devm_pinctrl_get(dev);
     if (IS_ERR(inf->pctl)) {
@@ -316,59 +326,52 @@ static int watchdog_pin_probe(struct platform_device *op)
         }
     }
 
-
-	inf->toggle_pin = of_get_named_gpio(np,"mcn,toggle-pin",0);
-	if(inf->toggle_pin < 0){
+	inf->toggle_pin = of_get_named_gpio(np, "mcn,toggle-pin", 0);
+	if (inf->toggle_pin < 0) {
 		dev_err(dev, "Memory exhausted!\n");
 		return -ENOMEM;		
 	}
-	rc=devm_gpio_request(dev,inf->toggle_pin, "watchdog_pin");
-	if(rc < 0){
+	rc = devm_gpio_request(dev, inf->toggle_pin, "watchdog_pin");
+	if (rc < 0) {
 		dev_err(dev, "toggle pin is busy!\n");
 		return -ENOMEM;			
 	}
 
-	inf->port_det_pin=
-		of_get_named_gpio(np,"mcn,port-det-pin",0);
-	if(gpio_is_valid(inf->port_det_pin)){
-		rc=devm_gpio_request(dev,inf->port_det_pin,"port_det");	
-		if(rc<0)
+    inf->port_det_pin = of_get_named_gpio(np, "mcn,port-det-pin",0);
+	if (gpio_is_valid(inf->port_det_pin)) {
+		rc = devm_gpio_request(dev,inf->port_det_pin, "port_det");	
+		if (rc < 0)
 			dev_err(dev, "port det pin is busy!\n");		
 		gpio_direction_input(inf->port_det_pin);	
 	}
 	
-	inf->usb_switch_pin=
-		of_get_named_gpio(np,"mcn,usb-switch-pin",0);
+	inf->usb_switch_pin = of_get_named_gpio(np, "mcn,usb-switch-pin", 0);
 	if (gpio_is_valid(inf->usb_switch_pin) && gpio_is_valid(inf->port_det_pin)) {
-		rc=devm_gpio_request(dev,inf->usb_switch_pin,"usb_switch");	
-		if(rc<0)
+		rc = devm_gpio_request(dev, inf->usb_switch_pin, "usb_switch");	
+		if(rc < 0)
 			dev_err(dev, "usb switch pin is busy!\n");
-		if(0==gpio_get_value(inf->port_det_pin))
-			gpio_direction_output(inf->usb_switch_pin,0);	
+		if(0 == gpio_get_value(inf->port_det_pin))
+			gpio_direction_output(inf->usb_switch_pin, 0);
 		else
 			gpio_direction_output(inf->usb_switch_pin,1);
         gpio_export(inf->usb_switch_pin, 0);
         gpio_export(inf->port_det_pin, 0);
 
-        irq= gpio_to_irq(inf->port_det_pin);
-		rc = devm_request_threaded_irq(dev, irq, NULL,
-				port_det_handler,
-				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+        irq = gpio_to_irq(inf->port_det_pin);
+		rc = devm_request_threaded_irq(dev, irq, NULL, port_det_handler, IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
 				"port_det_handler", inf);
 		if (rc < 0) {
-			dev_err(dev,
-				"request_irq for irq=%d  failed rc = %d\n",
-				irq, rc);
-		}	
-	}	
+			dev_err(dev, "request_irq for irq=%d  failed rc = %d\n", irq, rc);
+		}
+	}
 
-	proc_rf_kill_pin = inf->rf_kill_pin = of_get_named_gpio(np,"mcn,rf-kill-pin", 0);
+	proc_rf_kill_pin = inf->rf_kill_pin = of_get_named_gpio(np, "mcn,rf-kill-pin", 0);
 
     if (gpio_is_valid(inf->rf_kill_pin)) {
         rc = devm_gpio_request(dev,inf->rf_kill_pin,"rf-kill-pin");
         if (rc < 0) {
             dev_err(dev, "rf-kill-pin is busy!\n");
-            return -ENOMEM;			
+            return -ENOMEM;
         }
         gpio_direction_output(inf->rf_kill_pin, 1);
         gpio_export(inf->rf_kill_pin, 0);
@@ -392,12 +395,10 @@ static int watchdog_pin_probe(struct platform_device *op)
 	}
 
 	rc = of_property_read_u32(np, "mcn,high-delay", &inf->high_delay);
-
-	if(rc<0)
+	if (rc < 0)
 		inf->high_delay=1000;
-
 	rc = of_property_read_u32(np, "mcn,low-delay", &inf->low_delay);
-	if(rc<0)
+	if(rc < 0)
 		inf->low_delay=1000;	
 
     inf->dev = dev;
@@ -416,31 +417,36 @@ static int watchdog_pin_probe(struct platform_device *op)
     } else {
         inf->suspend = 0;
     }
+
     gpio_direction_output(inf->toggle_pin, inf->state);
-    gpio_export(inf->toggle_pin, 0);
+    gpio_export(inf->toggle_pin, 1);
     pr_notice("init toggle pin[%d]\n", inf->state);
-    if (inf->high_delay || inf->low_delay) {
-        pr_notice("launch toggle work[%d]\n", inf->state);
-        INIT_DELAYED_WORK(&inf->toggle_work, watchdog_toggle_work);
-        schedule_delayed_work(&inf->toggle_work, msecs_to_jiffies(inf->low_delay));	
+    if (-1 == inf->portable) {
+        gpio_set_value(inf->toggle_pin, inf->state);
     } else {
-        inf->state = 1;
-        gpio_set_value(inf->toggle_pin, inf->state^1);
-        pr_notice("notify to cradle PON[%d]\n", inf->state);
+        if (inf->high_delay || inf->low_delay) {
+            pr_notice("launch toggle work[%d]\n", inf->state);
+            INIT_DELAYED_WORK(&inf->toggle_work, watchdog_toggle_work);
+            schedule_delayed_work(&inf->toggle_work, msecs_to_jiffies(inf->low_delay));	
+        } else {
+            inf->state = 1;
+            gpio_set_value(inf->toggle_pin, inf->state^1);
+            pr_notice("notify to cradle PON[%d]\n", inf->state);
+        }
+
+        inf->mdev.minor = MISC_DYNAMIC_MINOR;
+        inf->mdev.name	= "rf_kill_pin";
+        inf->mdev.fops	= &rfkill_operations;
+        misc_register(&inf->mdev);
+
+        snprintf(inf->attr_pin.name, sizeof(inf->attr_pin.name) - 1, "rf_kill_pin");
+        inf->attr_pin.attr.attr.name = inf->attr_pin.name;
+        inf->attr_pin.attr.attr.mode = 0444;
+        inf->attr_pin.attr.show = rfkillpin_show;
+        inf->attr_pin.attr.store = rfkillpin_store;
+        sysfs_attr_init(&inf->attr_pin.attr.attr);
+        device_create_file(dev, &inf->attr_pin.attr);
     }
-
-    inf->mdev.minor = MISC_DYNAMIC_MINOR;
-    inf->mdev.name	= "rf_kill_pin";
-    inf->mdev.fops	= &rfkill_operations;
-	misc_register(&inf->mdev);
-
-    snprintf(inf->attr_pin.name, sizeof(inf->attr_pin.name) - 1, "rf_kill_pin");
-    inf->attr_pin.attr.attr.name = inf->attr_pin.name;
-    inf->attr_pin.attr.attr.mode = 0444;
-    inf->attr_pin.attr.show = rfkillpin_show;
-    inf->attr_pin.attr.store = rfkillpin_store;
-    sysfs_attr_init(&inf->attr_pin.attr.attr);
-    device_create_file(dev, &inf->attr_pin.attr);
 
     snprintf(inf->attr_toggle.name, sizeof(inf->attr_toggle.name) - 1, "wd_toggle_active");
     inf->attr_toggle.attr.attr.name = inf->attr_toggle.name;
@@ -450,7 +456,9 @@ static int watchdog_pin_probe(struct platform_device *op)
     sysfs_attr_init(&inf->attr_toggle.attr.attr);
     device_create_file(dev, &inf->attr_toggle.attr);
 
-    proc_create("rfkillpin", S_IRUSR | S_IRGRP | S_IROTH, 0, &proc_rfkill_operations);
+    if (inf->portable >= 0) {
+        proc_create("rfkillpin", S_IRUSR | S_IRGRP | S_IROTH, 0, &proc_rfkill_operations); 
+    }
 
 	return 0;
 }
@@ -479,25 +487,27 @@ static int watchdog_pin_prepare(struct device *dev)
     }
     spin_unlock_irqrestore(&wdi->rfkillpin_lock, wdi->lock_flags);
 
-    cancel_delayed_work(&wdi->toggle_work);
+    if (wdi->portable >= 0) {
+        cancel_delayed_work(&wdi->toggle_work);
 
-    if(gpio_is_valid(wdi->rf_kill_pin)){
-        pr_notice("shut down rf %lld\n", ktime_to_ms(ktime_get()));
-        gpio_direction_output(wdi->rf_kill_pin, wdi->rf_state^1);
-    }
-
-    if (gpio_is_valid(wdi->toggle_pin)) {
-        pr_notice("set toggle pin to inactive [%d] %lld\n", wdi->state, ktime_to_ms(ktime_get()));
-        d = 1; //!wdi->portable;
-        if (wdi->high_delay == wdi->low_delay) {
-            //d = 1;
+        if(gpio_is_valid(wdi->rf_kill_pin)){
+            pr_notice("shut down rf %lld\n", ktime_to_ms(ktime_get()));
+            gpio_direction_output(wdi->rf_kill_pin, wdi->rf_state^1);
         }
-        gpio_direction_output(wdi->toggle_pin, d);
-    }
 
-	if(gpio_is_valid(wdi->suspend_ind)){
-        pr_notice("notify to mcu[obc5] about suspend %lld\n", ktime_to_ms(ktime_get()));
-        gpio_direction_output(wdi->suspend_ind, wdi->suspend_ind_a);
+        if (gpio_is_valid(wdi->toggle_pin)) {
+            pr_notice("set toggle pin to inactive [%d] %lld\n", wdi->state, ktime_to_ms(ktime_get()));
+            d = 1; //!wdi->portable;
+            if (wdi->high_delay == wdi->low_delay) {
+                //d = 1;
+            }
+            gpio_direction_output(wdi->toggle_pin, d);
+        }
+
+    	if(gpio_is_valid(wdi->suspend_ind)){
+            pr_notice("notify to mcu[obc5] about suspend %lld\n", ktime_to_ms(ktime_get()));
+            gpio_direction_output(wdi->suspend_ind, wdi->suspend_ind_a);
+        }
     }
 
     pr_notice("prepared %lld\n", ktime_to_ms(ktime_get()));
@@ -555,7 +565,9 @@ static void watchdog_pin_complete(struct device *dev)
 
     pr_notice("complete and restart toggling %lld\n", ktime_to_ms(ktime_get()));
 
-    schedule_delayed_work(&wdi->toggle_work, 0);	
+    if (wdi->portable >= 0) {
+        schedule_delayed_work(&wdi->toggle_work, 0);	
+    }
 
     return;
 }
@@ -564,7 +576,9 @@ static void watchdog_pin_shutdown(struct platform_device *dev)
 {
     struct watch_dog_pin_info *wdi = dev_get_drvdata(&dev->dev);
 
-    cancel_delayed_work(&wdi->toggle_work);
+    if (wdi->portable >= 0) {
+        cancel_delayed_work(&wdi->toggle_work);
+    }
 
     spin_lock_irqsave(&wdi->rfkillpin_lock, wdi->lock_flags);
     wdi->suspend = 1;
@@ -594,6 +608,7 @@ static const struct dev_pm_ops watchdog_pin_pm_ops =
 static struct of_device_id watchdog_pin_match[] = {
 	{ .compatible = "mcn,watchdog-pin", },
     { .compatible = "mcn,fixed-watchdog-pin", },
+    { .compatible = "mcn,pwr-button-timer-fb", },
 	{},
 };
 

@@ -13,19 +13,19 @@
 
 /dts-v1/;
 
-#include "sdm450.dtsi"
-#include "sdm450-pmi632.dtsi"
+#include "sdm450-sb.dtsi"
+#include "sdm450-pmi632-sb.dtsi"
 #include "msm8953-pmi632-panel-camera.dtsi"
 
 / {
-	model = "Qualcomm Technologies, Inc. SDM450 + PMI632 SOC";
+	model = "Qualcomm Technologies, Inc. SDM450 + PMI632 SOC, single board smartcam";
 	compatible = "qcom,sdm450";
 	qcom,pmic-id = <0x010016 0x25 0x0 0x0>;
 	qcom,pmic-name = "PMI632";
 };
 
 &sdhc_2 {
-	cd-gpios = <&tlmm 133 GPIO_ACTIVE_LOW>;
+	cd-gpios = <&tlmm 133 GPIO_ACTIVE_HIGH>;
 };
 
 &pm8953_l17 {
@@ -36,57 +36,53 @@
 
 &soc {
 	virtual_leds {
-		compatible = "virtual-leds-fixed";
-		status = "okay";
+		status = "disabled";
 	};
 
 	virtual_j1708 {
-		compatible = "virtual-j1708";
+		status = "disabled";
+	};
+
+	fixed-vinputs {
+		compatible = "mcn,tlmm-based-vinputs";
+		pinctrl-names = "automotive_inputs_active", "automotive_inputs_suspend";
+		pinctrl-0 = <&automotive_inputs_active>;
+		pinctrl-1 = <&automotive_inputs_suspend>;
+		mcn,ain-0 = <&tlmm 36 GPIO_ACTIVE_LOW>;
+		mcn,ain-1 = <&tlmm 65 GPIO_ACTIVE_LOW>;
+		interrupt-parent = <&tlmm>;
+		interrupt-names = "ain-0", "ain-1";
+		interrupts = <&tlmm 36 IRQ_TYPE_EDGE_BOTH>, <&tlmm 65 IRQ_TYPE_EDGE_BOTH>;
 		status = "okay";
 	};
 
 	watchdogpin {
-		compatible = "mcn,fixed-watchdog-pin";
+		compatible = "mcn,pwr-button-timer-fb";
 		pinctrl-names = "watchdog_pin_active", "watchdog_pin_suspend";
 		pinctrl-0 = <&watchdog_pin_active>;		
 		pinctrl-1 = <&watchdog_pin_suspend>;
-		mcn,toggle-pin = <&tlmm 36 0>;
-		mcn,rf-kill-pin = <&tlmm 99 0>;
-		mcn,high-delay=<1000>;
-		mcn,low-delay=<1000>;
+		mcn,toggle-pin = <&tlmm 64 0>;
 		status = "okay";
 	};
 
 	dock {
-		compatible = "mcn,fixed-dock-switch";
+		compatible = "mcn,sb-dock-switch";
 		pinctrl-names = "dock_pins_active", "dock_pin_suspend";
 		pinctrl-0 = <&dock_pins_active>;
 		pinctrl-1 = <&dock_pin_suspend>;
-		mcn,dock-pin = <&tlmm 21 GPIO_ACTIVE_LOW>;
-		/* usb switch hw controlled by vbus_cradle signal */
-		mcn,usb-switch-pin = <&tlmm 18 GPIO_ACTIVE_HIGH>;
-		/*mcn,otg-en-pin = <&tlmm 97 GPIO_ACTIVE_HIGH>;*/
-		mcn,mic-switch-pin = <&tlmm 19 GPIO_ACTIVE_HIGH>;
+		mcn,aout-0 = <&tlmm 131 GPIO_ACTIVE_HIGH>;
+		mcn,aout-1 = <&tlmm 19 GPIO_ACTIVE_HIGH>;
+		mcn,dock-pin = <&tlmm 97 GPIO_ACTIVE_HIGH>;
+		interrupt-names = "ignition-changed";
+		interrupt-parent = <&tlmm>;
+		interrupts = <&tlmm 97 0>;
 		tuner-supply = <&pm8953_l10>;
 		ldoa2-supply = <&pm8953_l2>;
 		ldoa6-supply = <&pm8953_l6>;
 		ldoa17-supply = <&pm8953_l17>;
 		ldoa22-supply = <&pm8953_l22>;
 		ldoa23-supply = <&pm8953_l23>;
-		interrupt-names = "cradle-detect";
-		interrupt-parent = <&tlmm>;
-		interrupts = <&tlmm 21 0>;
-		status = "okay";
-	};
-
-	hi3w {
-		compatible = "mcn,hi-3w";
-		pinctrl-names = "default", "sleep";
-		pinctrl-0 = <&hi_3w_pins_active>;
-		pinctrl-1 = <&hi_3w_pin_suspend>;
-		mcn,3w-clock-pin = <&tlmm 13 GPIO_ACTIVE_LOW>;
-		mcn,3w-miso-pin = <&tlmm 89 GPIO_ACTIVE_LOW>;
-		mcn,3w-mosi-pin = <&tlmm 2 GPIO_ACTIVE_LOW>;
+		qcom,ignition_v-vadc = <&pmi632_vadc>;
 		status = "okay";
 	};
 
@@ -102,23 +98,22 @@
 	};
 
 	pwr_loss_mon {
-		compatible = "mcn,pwr-loss-mon";
+		compatible = "mcn,pwr-loss-mon-sb";
 		pinctrl-names = "pwr_loss_mon_active", "pwr_loss_mon_suspend";
-		pinctrl-0 = <&pwr_loss_mon_active>;
-		pinctrl-1 = <&pwr_loss_mon_suspend>;
-		mcn,pwr-loss-mon = <&tlmm 98 GPIO_ACTIVE_LOW>;
+		pinctrl-0 = <&pwr_loss_mon_active &pwr_loss_batt_empty_active>;
+		pinctrl-1 = <&pwr_loss_mon_suspend &pwr_loss_batt_empty_suspend>;
+		mcn,pwr-loss-mon = <&tlmm 18 GPIO_ACTIVE_LOW>;
+		mcn,pwr-batt-empty = <&tlmm 21 GPIO_ACTIVE_LOW>;
+		mcn,pwr-batt-chg = <&tlmm 89 GPIO_ACTIVE_LOW>;
 		mcn,wan-off-delay = <0>;
 		mcn,wlan-off-delay = <0>;
 		mcn,plat-off-delay = <180000>;
 		/*mcn,plat-off-delay = <0xFFFFFFFF>;*/
 		interrupt-names = "pwr-loss";
 		interrupt-parent = <&tlmm>;
-		interrupts = <&tlmm 98 0>;
-		status = "okay";
-	};
-
-	fixed-vinputs {
-		compatible = "mcn,fixed-vinputs";
+		interrupts = <&tlmm 18 0>;
+		qcom,mpp2_adc-vadc = <&pm8953_vadc>;
+		mcn,batt-v-channel = <0x21>;
 		status = "okay";
 	};
 
@@ -134,6 +129,18 @@
 };
 
 &blsp1_serial1 {
+	status = "disabled";
+};
+
+&blsp2_uart0_gs {
+	status = "disabled";
+};
+
+&i2c_1  {
+	status = "disabled";
+};
+
+&i2c_5  {
 	status = "disabled";
 };
 

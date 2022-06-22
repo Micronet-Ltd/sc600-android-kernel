@@ -2,6 +2,12 @@ dtb-$(CONFIG_ARCH_QCOM)	+= apq8016-sbc.dtb msm8916-mtp.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= apq8096-db820c.dtb
 
+ifeq ($(CONFIG_BOARD_VARIANT_SB),y)
+sdm450-pmi632-base.dtb := sdm450-pmi632-sb.dtb
+else
+sdm450-pmi632-base.dtb := sdm450-pmi632.dtb
+endif
+
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 	dtbo-$(CONFIG_ARCH_SDM845) += \
 		sdm845-cdp-overlay.dtbo \
@@ -462,17 +468,17 @@ msm8953-ext-codec-mtp-overlay.dtbo-base := msm8953.dtb \
 msm8953-ext-codec-rcm-overlay.dtbo-base := msm8953.dtb \
 	apq8053.dtb
 msm8953-cdp-1200p-overlay.dtbo-base := msm8953.dtb
-sdm450-cdp-s2-overlay.dtbo-base := sdm450-pmi632.dtb \
+sdm450-cdp-s2-overlay.dtbo-base := $(sdm450-pmi632-base.dtb) \
 	sdm632.dtb \
 	sdm632-pm8004.dtb \
 	msm8953-pmi632.dtb \
 	sda450-pmi632.dtb
 sdm450-no-pmi-overlay.dtbo-base := sdm450-no-pmi.dtb
-sdm450-mtp-s3-overlay.dtbo-base := sdm450-pmi632.dtb \
+sdm450-mtp-s3-overlay.dtbo-base := $(sdm450-pmi632-base.dtb) \
 	sdm632.dtb \
 	sdm632-pm8004.dtb \
 	sda450-pmi632.dtb
-sdm450-qrd-sku4-overlay.dtbo-base := sdm450-pmi632.dtb \
+sdm450-qrd-sku4-overlay.dtbo-base := $(sdm450-pmi632-base.dtb) \
 	sdm632.dtb \
 	sdm632-pm8004.dtb
 sdm632-rumi-overlay.dtbo-base := sdm632.dtb

@@ -379,6 +379,8 @@ static int smb5_parse_dt(struct smb5 *chip)
 {
 	struct smb_charger *chg = &chip->chg;
 	struct device_node *node = chg->dev->of_node;
+    struct pinctrl *pctl;
+    struct pinctrl_state *pctls;
 	int rc, byte_len;
 
 	if (!node) {
@@ -515,7 +517,34 @@ static int smb5_parse_dt(struct smb5 *chip)
 	chg->fcc_stepper_enable = of_property_read_bool(node,
 					"qcom,fcc-stepping-enable");
 
-	if (of_find_property(node, "qcom,ssmux-gpio", NULL)) {
+    pctl = devm_pinctrl_get(chg->dev);
+    if (!IS_ERR(pctl)) {
+        pctls = pinctrl_lookup_state(pctl, "default");
+        if (IS_ERR(pctls)) {
+            dev_err(chg->dev, "failure to get pinctrl default state\n");
+        } else {
+            rc = pinctrl_select_state(pctl, pctls);
+        }
+    } else {
+        dev_err(chg->dev, "pin control isn't used\n");
+    }
+
+    if (of_find_property(node, "qcom,sspd-gpio", 0)) {
+        chg->sspd_gpio = of_get_named_gpio_flags(node, "qcom,sspd-gpio", 0, &chg->gpio_flag);
+        if (gpio_is_valid(chg->sspd_gpio)) {
+            rc = devm_gpio_request(chg->dev, chg->sspd_gpio, "typec_sspd_gpio");
+            if (rc) {
+                dev_err(chg->dev, "sspd pin is busy\n");
+            } else {
+                gpio_direction_output(chg->sspd_gpio, !chg->gpio_flag);
+                gpio_export(chg->sspd_gpio, 1);
+            }
+        } else {
+            dev_err(chg->dev, "sspd pin isn't used\n");
+        }
+    }
+
+    if (of_find_property(node, "qcom,ssmux-gpio", NULL)) {
 		chg->ssmux_gpio = of_get_named_gpio_flags(node,
 				"qcom,ssmux-gpio", 0, &chg->gpio_flag);
 		if (!gpio_is_valid(chg->ssmux_gpio)) {
@@ -1061,10 +1090,31 @@ static int smb5_init_usb_port_psy(struct smb5 *chip)
  * USB MAIN PSY REGISTRATION *
  *****************************/
 
+static int smb5_usb_main_prop_is_writeable(struct power_supply *psy,
+		enum power_supply_property psp)
+{
+	int rc;
+
+	switch (psp) {
+        case POWER_SUPPLY_PROP_ONLINE:
+        case POWER_SUPPLY_PROP_PRESENT:
+            rc = 1;
+            break;
+    	default:
+    		rc = 0;
+    		break;
+	}
+
+	return rc;
+}
+
 static enum power_supply_property smb5_usb_main_props[] = {
+    POWER_SUPPLY_PROP_PRESENT,
+    POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
 	POWER_SUPPLY_PROP_TYPE,
+    POWER_SUPPLY_PROP_REAL_TYPE,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_SETTLED,
 	POWER_SUPPLY_PROP_INPUT_VOLTAGE_SETTLED,
 	POWER_SUPPLY_PROP_FCC_DELTA,
@@ -1082,16 +1132,29 @@ static int smb5_usb_main_get_prop(struct power_supply *psy,
 	int rc = 0;
 
 	switch (psp) {
-	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+    case POWER_SUPPLY_PROP_PRESENT:
+        val->intval = chg->pwr_brd_auth;
+        break;
+    case POWER_SUPPLY_PROP_ONLINE:
+        val->intval = chg->pwr_brd_auth;
+        break;
+    case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 		rc = smblib_get_charge_param(chg, &chg->param.fv, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
 		rc = smblib_get_charge_param(chg, &chg->param.fcc,
 							&val->intval);
 		break;
-	case POWER_SUPPLY_PROP_TYPE:
-		val->intval = POWER_SUPPLY_TYPE_MAIN;
+    case POWER_SUPPLY_PROP_TYPE:
+        val->intval = POWER_SUPPLY_TYPE_MAINS;
 		break;
+    case POWER_SUPPLY_PROP_REAL_TYPE:
+        if (chg->pwr_brd_auth) {
+            val->intval = POWER_SUPPLY_TYPE_MAINS; 
+        } else {
+            val->intval = POWER_SUPPLY_TYPE_MAIN; 
+        }
+        break;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_SETTLED:
 		rc = smblib_get_prop_input_current_settled(chg, val);
 		break;
@@ -1133,6 +1196,9 @@ static int smb5_usb_main_set_prop(struct power_supply *psy,
 	int rc = 0;
 
 	switch (psp) {
+    case POWER_SUPPLY_PROP_PRESENT:
+        chg->pwr_brd_auth = val->intval;
+        break; 
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 		rc = smblib_set_charge_param(chg, &chg->param.fv, val->intval);
 		break;
@@ -1184,11 +1250,12 @@ static int smb5_usb_main_set_prop(struct power_supply *psy,
 
 static const struct power_supply_desc usb_main_psy_desc = {
 	.name		= "main",
-	.type		= POWER_SUPPLY_TYPE_MAIN,
+	.type		= POWER_SUPPLY_TYPE_MAINS,
 	.properties	= smb5_usb_main_props,
 	.num_properties	= ARRAY_SIZE(smb5_usb_main_props),
 	.get_property	= smb5_usb_main_get_prop,
 	.set_property	= smb5_usb_main_set_prop,
+    .property_is_writeable = smb5_usb_main_prop_is_writeable,
 };
 
 static int smb5_init_usb_main_psy(struct smb5 *chip)
@@ -1627,7 +1694,8 @@ static int smb5_batt_prop_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_STEP_CHARGING_ENABLED:
 	case POWER_SUPPLY_PROP_SW_JEITA_ENABLED:
 	case POWER_SUPPLY_PROP_DIE_HEALTH:
-	case POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED:
+    case POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED:
+    case POWER_SUPPLY_PROP_SET_SHIP_MODE:
 		return 1;
 	default:
 		break;

@@ -15,6 +15,7 @@
  *
  */
 
+#define pr_fmt(fmt) "%s: " fmt, __func__
 #include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -142,6 +143,7 @@ static inline int msm_spi_request_gpios(struct msm_spi *dd)
 			__func__, SPI_PINCTRL_STATE_DEFAULT);
 			goto error;
 		}
+        dev_notice(dd->dev, "%s mux selected\n", SPI_PINCTRL_STATE_DEFAULT);
 	}
 	return 0;
 error:
@@ -176,6 +178,9 @@ static inline void msm_spi_free_gpios(struct msm_spi *dd)
 		if (result)
 			dev_err(dd->dev, "%s: Can not set %s pins\n",
 			__func__, SPI_PINCTRL_STATE_SLEEP);
+        else {
+            dev_notice(dd->dev, "%s mux selected\n", SPI_PINCTRL_STATE_SLEEP);
+        }
 	}
 }
 
@@ -1774,6 +1779,7 @@ static int msm_spi_setup(struct spi_device *spi)
 		return -EINVAL;
 	}
 
+    dev_notice(&spi->dev, "SS[%u]\n", spi->chip_select);
 	dd = spi_master_get_devdata(spi->master);
 
 	rc = pm_runtime_get_sync(dd->dev);
@@ -2179,7 +2185,7 @@ static int msm_spi_dt_to_pdata_populate(struct platform_device *pdev,
 			ret = -EBADE;
 		}
 
-		dev_dbg(&pdev->dev, "DT entry ret:%d name:%s val:%d\n",
+		dev_notice(&pdev->dev, "DT entry ret:%d name:%s val:%d\n",
 				ret, itr->dt_name, *((int *)itr->ptr_data));
 
 		if (ret) {

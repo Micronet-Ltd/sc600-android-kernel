@@ -4295,9 +4295,11 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 
 	ctrl_pdata->rst_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 			 "qcom,platform-reset-gpio", 0);
-	if (!gpio_is_valid(ctrl_pdata->rst_gpio))
+	if (!gpio_is_valid(ctrl_pdata->rst_gpio)) {
 		pr_err("%s:%d, reset gpio not specified\n",
-						__func__, __LINE__);
+                        __func__, __LINE__);
+        ctrl_pdata->rst_gpio = -1;
+    }
 
 	if (pinfo->mode_gpio_state != MODE_GPIO_NOT_VALID) {
 

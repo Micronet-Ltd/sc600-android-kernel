@@ -1430,9 +1430,11 @@ static int spi_panel_device_register(struct device_node *pan_node,
 
 	ctrl_pdata->rst_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 			 "qcom,platform-reset-gpio", 0);
-	if (!gpio_is_valid(ctrl_pdata->rst_gpio))
+	if (!gpio_is_valid(ctrl_pdata->rst_gpio)) {
 		pr_err("%s:%d, reset gpio not specified\n",
-						__func__, __LINE__);
+                        __func__, __LINE__);
+        ctrl_pdata->rst_gpio = -1;
+    }
 
 	ctrl_pdata->panel_data.event_handler = mdss_spi_panel_event_handler;
 

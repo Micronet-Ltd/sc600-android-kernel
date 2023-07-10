@@ -100,43 +100,22 @@
 		pinctrl-0 = <&gpio_led_default>;
 
 		blue {
-			gpios = <&tlmm 22 0x0>;
+			gpios = <&tlmm 99 0x0>;
 			label = "blue";
 			linux,default-trigger = "none";
 			default-state = "off";
 			retain-state-suspended;
 		};
 		green {
-			gpios = <&tlmm 20 0x0>;
+			gpios = <&tlmm 98 0x0>;
 			label = "green";
 			linux,default-trigger = "none";
 			default-state = "off";
 			retain-state-suspended;
 		};
 		red {
-			gpios = <&tlmm 23 0x0>;
-			label = "red";
-			linux,default-trigger = "none";
-			default-state = "off";
-			retain-state-suspended;
-		};
-		blue-1 {
-			gpios = <&tlmm 99 0x0>;
-			label = "blue-1";
-			linux,default-trigger = "none";
-			default-state = "off";
-			retain-state-suspended;
-		};
-		green-1 {
-			gpios = <&tlmm 98 0x0>;
-			label = "green-1";
-			linux,default-trigger = "none";
-			default-state = "off";
-			retain-state-suspended;
-		};
-		red-1 {
 			gpios = <&tlmm 3 0x0>;
-			label = "red-1";
+			label = "red";
 			linux,default-trigger = "none";
 			default-state = "off";
 			retain-state-suspended;
@@ -453,6 +432,7 @@
 	};
 };
 
+/*
 &tlmm {
 	pmx_mdss {
 		mdss_dsi_active: mdss_dsi_active {
@@ -473,3 +453,4 @@
 		  };
 	};
 };
+*/

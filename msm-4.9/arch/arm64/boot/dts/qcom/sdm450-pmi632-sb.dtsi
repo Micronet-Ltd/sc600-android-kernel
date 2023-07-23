@@ -72,18 +72,19 @@
 &pmi632_charger {
 	qcom,battery-data = <&mtp_batterydata>;
 	qcom,ssmux-gpio = <&tlmm 139 GPIO_ACTIVE_LOW>;
-	qcom,sspd-gpio = <&tlmm 44 GPIO_ACTIVE_LOW>;
+	/*qcom,sspd-gpio = <&tlmm 44 GPIO_ACTIVE_LOW>;*/
+	qcom,otg-en-gpio = <&tlmm 12 GPIO_ACTIVE_HIGH>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&typec_ssmux_config>;
+	pinctrl-0 = <&typec_ssmux_config &ssusb_mode_sel>;
 };
 
 &pm8953_gpios {
 	bklt_en {
 		bklt_en_default: bklt_en_default {
-		pins = "gpio4";
-		function = "normal";
-		power-source = <3>;
-		//output-high;
+			pins = "gpio4";
+			function = "normal";
+			power-source = <3>;
+			/*output-high;*/
 		};
 	};
 };

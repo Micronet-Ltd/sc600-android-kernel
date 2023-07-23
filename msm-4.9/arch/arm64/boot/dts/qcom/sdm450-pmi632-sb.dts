@@ -29,6 +29,7 @@
 };
 
 &i2c_2 {
+	status = "ok";
 	pn548@29 {
 		compatible = "qcom,pn548";
 		reg = <0x29>;
@@ -39,15 +40,36 @@
 		qcom,nq-clkreq = <&pm8953_gpios 2 0x00>;
 		interrupt-parent = <&tlmm>;
 		qcom,clk-src = "BBCLK2";
-		interrupts = <90 0>;
+		interrupts = <&tlmm 90 0>;
 		interrupt-names = "nfc_irq";
 		pinctrl-names = "nfc_active", "nfc_suspend";
 		pinctrl-0 = <&nfc_int_active &nfc_disable_active>;
-
 		pinctrl-1 = <&nfc_int_suspend &nfc_disable_suspend>;
 		clocks = <&clock_gcc clk_bb_clk2_pin>;
 		clock-names = "ref_clk";
 		status = "ok";
+	};
+};
+
+&spi_6 { /* BLSP2 QUP2 (CAN) */
+	status = "ok";
+	can0:mcp25625@0 {
+		status = "ok";
+		compatible = "microchip,mcp25625";
+		reg = <0x0>;
+		spi-max-frequency = <9600000>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <&tlmm 66 IRQ_TYPE_LEVEL_LOW>;
+		oscillator-frequency = <20000000>;
+		/*clocks = <&can_osc_fixed>;*/
+		/*avdd-supply = <&pm8916_lx>;
+		dvdd-supply = <&pm8916_lx>;*/
+		mcp25625,irq-pin = <&tlmm 66 GPIO_ACTIVE_LOW>;
+		mcp25625,reset-pin = <&tlmm 39 GPIO_ACTIVE_LOW>;
+		mcp25625,standby-pin = <&tlmm 45 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "mcp25625_standby_active","mcp25625_standby_suspend";
+		pinctrl-0 = <&mcp25625_int_active &mcp25625_standby_active>;
+		pinctrl-1 = <&mcp25625_int_suspend &mcp25625_standby_suspend>;
 	};
 };
 

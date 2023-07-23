@@ -1813,12 +1813,12 @@
 
 		typec_ssmux_config: typec_ssmux_config {
 			mux {
-				pins = "gpio139", "gpio44";
+				pins = "gpio139";
 				function = "gpio";
 			};
 
 			config {
-				pins = "gpio139", "gpio44";
+				pins = "gpio139";
 				drive-strength = <2>;
 				bias-disable;
 			};

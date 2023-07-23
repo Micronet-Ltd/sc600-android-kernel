@@ -2237,7 +2237,7 @@ static int _gpiod_direction_output_raw(struct gpio_desc *desc, int value)
         gpiod_err(desc,
 			  "%s: %s tried to set a GPIO tied to an IRQ as output\n",
                   __func__, (desc->gdev->label)?desc->gdev->label : "uncknown");
-		//return -EIO;//rid: gt9xx need set the GPIOs as output when the GPIOs used for IRQs.
+		return -EIO;
 	}
 
 	if (test_bit(FLAG_OPEN_DRAIN, &desc->flags)) {

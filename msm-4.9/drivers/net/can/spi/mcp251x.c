@@ -1532,7 +1532,7 @@ static int mcp251x_can_probe(struct spi_device *spi)
     } else {
         pdata->standby_pin = err;
     }
-    pdata->standby_l = !pdata->standby_l;
+    pdata->standby_l = pdata->standby_l;
 
 	/* Sanity check */
 	if (freq < 1000000 || freq > 25000000)

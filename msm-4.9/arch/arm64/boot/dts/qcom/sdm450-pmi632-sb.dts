@@ -57,7 +57,7 @@
 		status = "ok";
 		compatible = "microchip,mcp25625";
 		reg = <0x0>;
-		spi-max-frequency = <4800000>;
+		spi-max-frequency = <9600000>;
 		interrupt-parent = <&tlmm>;
 		interrupts = <&tlmm 66 IRQ_TYPE_LEVEL_LOW>;
 		oscillator-frequency = <20000000>;

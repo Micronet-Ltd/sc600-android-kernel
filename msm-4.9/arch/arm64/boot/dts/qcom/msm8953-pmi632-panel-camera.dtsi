@@ -43,13 +43,13 @@
 &mdss_dsi0 {
 	qcom,dsi-pref-prim-pan = <&dsi_ili9881d_720p_video>;
 	pinctrl-names = "mdss_default", "mdss_sleep";
-	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
-	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
+	pinctrl-0 = <&mdss_te_active>;
+	pinctrl-1 = <&mdss_te_suspend>;
 
 	qcom,platform-te-gpio = <&tlmm 24 0>;
-		qcom,platform-reset-gpio = <&tlmm 61 0>;
+/*	qcom,platform-reset-gpio = <&tlmm 61 0>;*/
 	qcom,platform-bklight-en-gpio = <&pm8953_gpios 4 0>;
-//	qcom,platform-enable-gpio = <&pmi632_gpios 6 0>;
+/*	qcom,platform-enable-gpio = <&pmi632_gpios 6 0>;*/
 };
 
 &mdss_dsi1 {

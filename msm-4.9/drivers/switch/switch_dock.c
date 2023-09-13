@@ -90,6 +90,7 @@ struct wake_lock {
 struct dock_switch_device {
 	struct  switch_dev sdev;
     struct  work_struct work;
+    struct  work_struct alps_work;
 	int     dock_pin;
     int 	ign_pin;
     int     usb_switch_pin;
@@ -99,6 +100,9 @@ struct dock_switch_device {
     int     dock_irq;
     int 	ign_irq;
 	int	    dock_active_l;
+    int     alps_pin;
+    int     alps_irq;
+    int	    alps_active_l;
 	int	    ign_active_l;
     int     usb_switch_l;
     int     otg_en_l;
@@ -106,6 +110,8 @@ struct dock_switch_device {
     int     mb_ind_l;
     unsigned sched_irq;
 	int	    state;
+    int	    alps_state;
+    int	    alps;
     struct  wake_lock wlock;
 	struct  device*	pdev;
     struct 	notifier_block ignition_notifier;
@@ -124,6 +130,7 @@ struct dock_switch_device {
     struct  dock_switch_attr attr_J1708_en;
     struct  dock_switch_attr attr_rs485_en;
     struct  dock_switch_attr attr_ign_v;
+    struct  dock_switch_attr attr_alps_state;
     spinlock_t outs_mask_lock;
     unsigned long lock_flags;
     unsigned outs_mask_state;
@@ -990,7 +997,7 @@ static void dock_switch_work_func_sb(struct work_struct *work)
         pr_notice("dock state changed to %d\n", val);
         fd = sys_open("/proc/mcu_version", O_WRONLY, 0);
         if (fd >= 0) {
-            sprintf(ver, "net888.v2");
+            sprintf(ver, "net888.v3");
             sys_write(fd, ver, strlen(ver));
             sys_close(fd);
         }
@@ -1011,6 +1018,79 @@ static void dock_switch_work_func_sb(struct work_struct *work)
 
         cradle_notify(val, 0);
 	}
+}
+
+#include <linux/proc_fs.h>
+
+static char als_s[8] = {0};
+
+static int als_print(struct seq_file *m, void *v) {
+    seq_printf(m, als_s);
+    return 0;
+}
+
+static int proc_als_open(struct inode *inode, struct  file *file) 
+{
+    return single_open(file, als_print, NULL);
+}
+
+static ssize_t proc_als_write(struct file *file, const char __user *buffer, size_t count, loff_t *pos)
+{
+    char als[8] = {0};
+
+    if (count > sizeof(als)) {
+        return -EFAULT;
+    }
+
+    if (copy_from_user(als, buffer, count)) { 
+        return -EFAULT;
+    }
+    memset(als_s, 0, sizeof(als_s));
+    strncpy(als_s, als, count);
+
+    return count; 
+}
+
+static const struct file_operations proc_als_fops = {
+    .owner      = THIS_MODULE,
+	.open	    = proc_als_open,
+	.read	    = seq_read,
+    .write	    = proc_als_write,
+	.llseek	    = seq_lseek,
+	.release    = single_release,
+};
+
+static void alps_work_func(struct work_struct *work)
+{
+	struct dock_switch_device *ds  = container_of(work, struct dock_switch_device, alps_work);
+    int val = 0;
+
+    mutex_lock(&ds->lock); 
+    if (ds->alps_active_l == gpio_get_value(ds->alps_pin)) {
+        pr_notice("high light %lld\n", ktime_to_ms(ktime_get()));
+        val = 1;
+    } else {
+        val = 0;
+        pr_notice("low light %lld\n", ktime_to_ms(ktime_get()));
+    }
+    mutex_unlock(&ds->lock);
+
+    if (ds->alps == val) {
+        struct device *dev;
+        struct kobject *kobj;
+        pr_notice("light state changed to %d\n", val);
+        ds->alps_state = val;
+        sprintf(als_s, "%s", (ds->alps_state)?"high":"low");
+        enable_switch_irq(ds->alps_irq, 1);
+        dev = ds->pdev;
+        kobj = &dev->kobj;
+        sysfs_notify(kobj, 0, ds->attr_alps_state.name);
+	} else {
+        pr_notice("debounce light state %d\n", val);
+        ds->alps = val;
+        msleep_interruptible(200);
+        schedule_work(&ds->alps_work);
+    }
 }
 
 static irqreturn_t dock_switch_irq_handler(int irq, void *arg)
@@ -1061,6 +1141,28 @@ static irqreturn_t dock_switch_irq_handler(int irq, void *arg)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t alps_irq_handler(int irq, void *arg)
+{
+	struct dock_switch_device *ds = (struct dock_switch_device *)arg;
+    struct irq_desc *irq_desc;
+
+    irq_desc = irq_to_desc(irq);
+    if (irq_desc) {
+        if (irq_desc->irq_data.chip->irq_mask) {
+            pr_notice("mask irq[%d]\n", irq);
+            irq_desc->irq_data.chip->irq_mask(&irq_desc->irq_data);
+        }
+        if (irq_desc->irq_data.chip->irq_ack) {
+            pr_notice("ack irq[%d]\n", irq);
+            irq_desc->irq_data.chip->irq_ack(&irq_desc->irq_data);
+        }
+    }
+    disable_irq_nosync(irq);
+    schedule_work(&ds->alps_work);
+
+	return IRQ_HANDLED;
+}
+
 static ssize_t dock_switch_print_state(struct switch_dev *sdev, char *buffer)
 {
 	struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
@@ -1078,6 +1180,26 @@ static int32_t __ref dock_switch_ign_callback(struct notifier_block *nfb, unsign
     }
 
     return NOTIFY_OK;
+}
+
+static ssize_t alps_state_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
+    struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
+
+	return sprintf(buf, "%d", ds->alps_state);
+}
+
+static ssize_t alps_state_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    struct switch_dev *sdev = (struct switch_dev *)dev_get_drvdata(dev);
+    struct dock_switch_device *ds = container_of(sdev, struct dock_switch_device, sdev);
+
+    if (kstrtou32(buf, 16, &ds->alps_state)) {
+        ;
+    }
+
+	return count;
 }
 
 static ssize_t dock_switch_outs_mask_state_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -1573,6 +1695,8 @@ static int dock_switch_probe(struct platform_device *pdev)
     dev_notice(dev, "%s: %s \n", (DOCK_SWITCH_SB == compatible)?"Single board net888":"TAB8 based", (DOCK_SWITCH_PORTABLE == compatible)?"portable":"fixed");
 
     ds->state = 0;
+    ds->alps_state = -1;
+    ds->alps = -1;
     do {
         ds->pctl = devm_pinctrl_get(dev);
         if (IS_ERR(ds->pctl)) {
@@ -1653,6 +1777,15 @@ static int dock_switch_probe(struct platform_device *pdev)
         }
         ds->dock_pin = err;
         ds->dock_active_l = !ds->dock_active_l;
+
+        err = of_get_named_gpio_flags(np, "mcn,2s-light-pin", 0, (enum of_gpio_flags *)&ds->alps_active_l);
+        ds->alps_pin = err;
+        ds->alps_active_l = !ds->alps_active_l;
+        if (!gpio_is_valid(err)) {
+            pr_err("ivalid alps pin\n");
+            ds->alps_pin = -1;
+            ds->alps_active_l = -1;
+        }
 
         if (gpio_is_valid(ds->dock_pin)) {
             err = devm_gpio_request(dev, ds->dock_pin, "dock-state");
@@ -1762,7 +1895,35 @@ static int dock_switch_probe(struct platform_device *pdev)
             }
 
             if (DOCK_SWITCH_SB == compatible) {
+        		if (gpio_is_valid(ds->alps_pin)) {
+            		err = devm_gpio_request(dev, ds->alps_pin, "light-state");
+            		if (err < 0) {
+                		pr_err("failure to request the gpio[%d]\n", ds->alps_pin);
+                		break;
+            		}
+            		err = gpio_direction_input(ds->alps_pin);
+            		if (err < 0) {
+                		pr_err("failure to set direction of the gpio[%d]\n", ds->alps_pin);
+                		break;
+            		}
+            		gpio_export(ds->alps_pin, 1);
+        		}
+
+                ds->alps_irq = gpio_to_irq(ds->alps_pin);
+                if (ds->alps_irq < 0) {
+                    pr_err("failure to request gpio[%d] irq\n", ds->alps_pin);
+                } else {
+                    err = devm_request_irq(dev, ds->alps_irq, alps_irq_handler,
+                                           IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+                                           pdev->name, ds);
+                    if (!err) {
+                        enable_switch_irq(ds->alps_irq, 0);
+                    } else {
+                        pr_err("failure to request irq[%d] irq -- polling available\n", ds->alps_irq);
+                    }
+                }
                 INIT_WORK(&ds->work, dock_switch_work_func_sb);
+        		INIT_WORK(&ds->alps_work, alps_work_func);
             } else {
                 INIT_WORK(&ds->work, dock_switch_work_func_fix);
 
@@ -1796,9 +1957,25 @@ static int dock_switch_probe(struct platform_device *pdev)
 
         ds->pdev = dev;
         dev_set_drvdata(dev, ds);
+
+        strncpy(als_s, "not set", sizeof("not set"));
+        proc_create("als_2s", S_IRUGO | S_IWUGO, NULL, &proc_als_fops);
+        pr_notice("int light state as %s %lld\n", als_s, ktime_to_ms(ktime_get()));
+
         ds->sched_irq = SWITCH_DOCK | SWITCH_IGN;
         pr_notice("sched reason[%u]\n", ds->sched_irq);
         schedule_work(&ds->work);
+        if (ds->alps_work.func) {
+            schedule_work(&ds->alps_work); 
+        }
+
+        snprintf(ds->attr_alps_state.name, sizeof(ds->attr_alps_state.name) - 1, "alps_state");
+        ds->attr_alps_state.attr.attr.name = ds->attr_alps_state.name;
+        ds->attr_alps_state.attr.attr.mode = S_IRUGO;//|S_IWUGO;
+        ds->attr_alps_state.attr.show = alps_state_show;
+        ds->attr_alps_state.attr.store = alps_state_store;
+        sysfs_attr_init(&ds->attr_alps_state.attr.attr);
+        device_create_file((&ds->sdev)->dev, &ds->attr_alps_state.attr);
 
         memset(ds->outs_pins, -1, sizeof(ds->outs_pins));
         ds->outs_mask_clr = ds->outs_mask_set = ds->outs_mask_state = 0;
@@ -1938,10 +2115,14 @@ static int dock_switch_probe(struct platform_device *pdev)
         devm_free_irq(&pdev->dev, ds->dock_irq, ds);
     if (ds->ign_irq)
         devm_free_irq(&pdev->dev, ds->ign_irq, ds);
+    if (ds->alps_irq)
+        devm_free_irq(&pdev->dev, ds->alps_irq, ds);
 	if (gpio_is_valid(ds->dock_pin))
         devm_gpio_free(&pdev->dev, ds->dock_pin);
     if (gpio_is_valid(ds->ign_pin))
         devm_gpio_free(&pdev->dev, ds->ign_pin);
+    if (gpio_is_valid(ds->alps_pin))
+        devm_gpio_free(&pdev->dev, ds->alps_pin);
 	devm_kfree(dev, ds);
 
 	pr_err("failure\n");
@@ -1956,6 +2137,7 @@ static int dock_switch_remove(struct platform_device *pdev)
 
     cancel_work_sync(&ds->work);
 
+    remove_proc_entry("als_2s", NULL);
 	device_remove_file((&ds->sdev)->dev, &dev_attr_ampl_enable);
     switch_dev_unregister(&ds->sdev);
 
@@ -1969,11 +2151,18 @@ static int dock_switch_remove(struct platform_device *pdev)
         disable_irq_nosync(ds->dock_irq);
         devm_free_irq(&pdev->dev, ds->dock_irq, ds);
     }
+    if (ds->alps_irq) {
+        disable_irq_nosync(ds->alps_irq);
+        devm_free_irq(&pdev->dev, ds->alps_irq, ds);
+    }
 
 	if (gpio_is_valid(ds->dock_pin)) 
 		devm_gpio_free(&pdev->dev, ds->dock_pin);
 	if (gpio_is_valid(ds->ign_pin))
 		devm_gpio_free(&pdev->dev, ds->ign_pin);
+
+    if (gpio_is_valid(ds->alps_pin)) 
+        devm_gpio_free(&pdev->dev, ds->alps_pin);
 
     for (i = 0; i < ds->outs_num; i++) {
         if (gpio_is_valid(ds->outs_pins[i])) {
@@ -2007,6 +2196,11 @@ static int dock_switch_suspend(struct device *dev)
         }
     }
 
+    if (ds->alps_irq) {
+        pr_notice("disable light sensing[%d]\n", ds->alps_irq);
+        enable_switch_irq(ds->alps_irq, 0);
+    }
+
     return 0;
 }
 
@@ -2034,6 +2228,9 @@ static int dock_switch_resume(struct device *dev)
     ds->resuming = 1;
     pr_notice("sched reason[%u]\n", ds->sched_irq); 
 	schedule_work(&ds->work);
+    if (ds->alps_work.func) {
+        schedule_work(&ds->alps_work); 
+    }
 
 	return 0;
 }

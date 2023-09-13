@@ -464,4 +464,15 @@ config FUJITSU_ES
 
 source "drivers/net/hyperv/Kconfig"
 
+config CAN
+	tristate "CAN device support"
+	depends on NET
+	default y
+	---help---
+	  You can say N here if you don't intend to connect your Linux box to
+	  any other computer at all.
+	  If unsure, say Y.
+
+source "drivers/net/can/Kconfig"
+
 endif # NETDEVICES

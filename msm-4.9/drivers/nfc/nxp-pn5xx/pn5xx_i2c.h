@@ -48,4 +48,5 @@ struct pn544_i2c_platform_data {
 	struct regulator *vbat_reg;
 	struct regulator *pmuvcc_reg;
 	struct regulator *sevdd_reg;
+    struct pinctrl *pctl;
 };

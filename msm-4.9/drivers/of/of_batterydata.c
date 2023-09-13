@@ -431,6 +431,7 @@ int of_batterydata_read_data(struct device_node *batterydata_container_node,
 		if (rc)
 			continue;
 		for (i = 0; i < batt_ids.num; i++) {
+            pr_notice("%s:%d.[%d] check match profile batt_id %d kohm to measured batt_id %d kohm\n", __func__, __LINE__, i, batt_ids.kohm[i], batt_id_kohm);
 			delta = abs(batt_ids.kohm[i] - batt_id_kohm);
 			if (delta < best_delta || !best_node) {
 				best_node = node;

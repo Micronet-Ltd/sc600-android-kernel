@@ -72,18 +72,19 @@
 &pmi632_charger {
 	qcom,battery-data = <&mtp_batterydata>;
 	qcom,ssmux-gpio = <&tlmm 139 GPIO_ACTIVE_LOW>;
-	qcom,sspd-gpio = <&tlmm 44 GPIO_ACTIVE_LOW>;
+	/*qcom,sspd-gpio = <&tlmm 44 GPIO_ACTIVE_LOW>;*/
+	qcom,otg-en-gpio = <&tlmm 12 GPIO_ACTIVE_HIGH>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&typec_ssmux_config>;
+	pinctrl-0 = <&typec_ssmux_config &ssusb_mode_sel>;
 };
 
 &pm8953_gpios {
 	bklt_en {
 		bklt_en_default: bklt_en_default {
-		pins = "gpio4";
-		function = "normal";
-		power-source = <3>;
-		//output-high;
+			pins = "gpio4";
+			function = "normal";
+			power-source = <3>;
+			/*output-high;*/
 		};
 	};
 };
@@ -100,43 +101,22 @@
 		pinctrl-0 = <&gpio_led_default>;
 
 		blue {
-			gpios = <&tlmm 22 0x0>;
+			gpios = <&tlmm 99 0x0>;
 			label = "blue";
 			linux,default-trigger = "none";
 			default-state = "off";
 			retain-state-suspended;
 		};
 		green {
-			gpios = <&tlmm 20 0x0>;
+			gpios = <&tlmm 98 0x0>;
 			label = "green";
 			linux,default-trigger = "none";
 			default-state = "off";
 			retain-state-suspended;
 		};
 		red {
-			gpios = <&tlmm 23 0x0>;
-			label = "red";
-			linux,default-trigger = "none";
-			default-state = "off";
-			retain-state-suspended;
-		};
-		blue-1 {
-			gpios = <&tlmm 99 0x0>;
-			label = "blue-1";
-			linux,default-trigger = "none";
-			default-state = "off";
-			retain-state-suspended;
-		};
-		green-1 {
-			gpios = <&tlmm 98 0x0>;
-			label = "green-1";
-			linux,default-trigger = "none";
-			default-state = "off";
-			retain-state-suspended;
-		};
-		red-1 {
 			gpios = <&tlmm 3 0x0>;
-			label = "red-1";
+			label = "red";
 			linux,default-trigger = "none";
 			default-state = "off";
 			retain-state-suspended;
@@ -453,6 +433,7 @@
 	};
 };
 
+/*
 &tlmm {
 	pmx_mdss {
 		mdss_dsi_active: mdss_dsi_active {
@@ -473,3 +454,4 @@
 		  };
 	};
 };
+*/

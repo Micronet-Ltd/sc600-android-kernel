@@ -343,8 +343,9 @@ int dsi_panel_trigger_esd_attack(struct dsi_panel *panel)
 		pr_info("GPIO pulled low to simulate ESD\n");
 		return 0;
 	}
-	pr_err("failed to pull down gpio\n");
-	return -EINVAL;
+//	pr_err("failed to pull down gpio\n");
+    return 0;
+//	return -EINVAL;
 }
 
 static int dsi_panel_reset(struct dsi_panel *panel)
@@ -362,17 +363,21 @@ static int dsi_panel_reset(struct dsi_panel *panel)
 	}
 
 	if (r_config->count) {
-		rc = gpio_direction_output(r_config->reset_gpio,
-			r_config->sequence[0].level);
-		if (rc) {
-			pr_err("unable to set dir for rst gpio rc=%d\n", rc);
-			goto exit;
-		}
+        if (gpio_is_valid(r_config->reset_gpio)) {
+            rc = gpio_direction_output(r_config->reset_gpio,
+                r_config->sequence[0].level);
+            if (rc) {
+                pr_err("unable to set dir for rst gpio rc=%d\n", rc);
+                goto exit;
+            }
+        }
 	}
 
 	for (i = 0; i < r_config->count; i++) {
-		gpio_set_value(r_config->reset_gpio,
-			       r_config->sequence[i].level);
+        if (gpio_is_valid(r_config->reset_gpio)) {
+            gpio_set_value(r_config->reset_gpio,
+                       r_config->sequence[i].level);
+        }
 
 
 		if (r_config->sequence[i].sleep_ms)
@@ -1899,8 +1904,9 @@ static int dsi_panel_parse_gpios(struct dsi_panel *panel,
 					      0);
 	if (!gpio_is_valid(panel->reset_config.reset_gpio)) {
 		pr_err("[%s] failed get reset gpio, rc=%d\n", panel->name, rc);
-		rc = -EINVAL;
-		goto error;
+//		rc = -EINVAL;
+//		goto error;
+        panel->reset_config.reset_gpio = -1;
 	}
 
 	panel->reset_config.disp_en_gpio = of_get_named_gpio(of_node,

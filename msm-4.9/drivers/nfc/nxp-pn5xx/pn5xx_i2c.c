@@ -120,12 +120,10 @@ static irqreturn_t pn54x_dev_irq_handler(int irq, void *dev_id)
 static int pn544_enable(struct pn54x_dev *dev, int mode)
 {
 	int r;
-	int hk_ret;
 
     /* turn on the regulators */
 	/* -- if the regulators were specified, they're required */
 	if (dev->pvdd_reg) {
-        DEBUG_NFC("%s: %d\n", __func__, __LINE__);
 		r = regulator_enable(dev->pvdd_reg);
 		if (r < 0){
 			pr_err("%s: not able to enable pvdd\n", __func__);
@@ -133,7 +131,6 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 		}
 	}
 	if (dev->vbat_reg) {
-        DEBUG_NFC("%s: %d\n", __func__, __LINE__);
 		r = regulator_enable(dev->vbat_reg);
 		if (r < 0){
 			pr_err("%s: not able to enable vbat\n", __func__);
@@ -141,7 +138,6 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 		}
 	}
 	if( dev->pmuvcc_reg) {
-        DEBUG_NFC("%s: %d\n", __func__, __LINE__);
 		r = regulator_enable(dev->pmuvcc_reg);
 		if (r < 0){
 			pr_err("%s: not able to enable pmuvcc\n", __func__);
@@ -149,7 +145,6 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 		}
 	}
 	if (dev->sevdd_reg) {
-        DEBUG_NFC("%s: %d\n", __func__, __LINE__);
 		r = regulator_enable(dev->sevdd_reg);
 		if (r < 0){
 			pr_err("%s: not able to enable sevdd\n", __func__);
@@ -161,36 +156,29 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 		pr_notice("%s power on\n", __func__);
 		if (gpio_is_valid(dev->firm_gpio)) {
 			gpio_set_value_cansleep(dev->firm_gpio, 0);
-            DEBUG_NFC("%s: %d dev->firm_gpio %d set 0\n", __func__, __LINE__,dev->firm_gpio);
 		}		
 		gpio_set_value_cansleep(dev->ven_gpio, 1);
 		msleep(100);
-		hk_ret = gpio_get_value(dev->ven_gpio);
 	} else if (MODE_FW == mode) {
 		/* power on with firmware download (requires hw reset)
 		 */
 		gpio_set_value(dev->ven_gpio, 1);
-        DEBUG_NFC("%s: %d dev->ven_gpio %d set 1\n", __func__, __LINE__,dev->ven_gpio);
+		pr_notice("power on with firmware\n");
 		msleep(20);
-		hk_ret = gpio_get_value(dev->ven_gpio);
 		if (gpio_is_valid(dev->firm_gpio)) {
 			gpio_set_value(dev->firm_gpio, 1);
-            DEBUG_NFC("%s: %d dev->ven_firm_gpio %d set 1\n", __func__, __LINE__,dev->firm_gpio);
-		}
-		else {
+		} else {
 			pr_err("%s Unused Firm GPIO %d\n", __func__, mode);
 			return GPIO_UNUSED;
 		}
+
 		msleep(20);
 		gpio_set_value(dev->ven_gpio, 0);
-		hk_ret = gpio_get_value(dev->ven_gpio);
 
 		msleep(100);
 		gpio_set_value(dev->ven_gpio, 1);
 		msleep(20);
-		hk_ret = gpio_get_value(dev->ven_gpio);
-	}
-	else {
+	} else {
 		pr_err("%s bad arg %d\n", __func__, mode);
 		return -EINVAL;
 	}
@@ -199,8 +187,6 @@ static int pn544_enable(struct pn54x_dev *dev, int mode)
 	
 	return 0;
 	
-//enable_exit3:	
-
 enable_exit2:
 	if(dev->pmuvcc_reg) regulator_disable(dev->pmuvcc_reg);
 enable_exit1:
@@ -215,11 +201,11 @@ static void pn544_disable(struct pn54x_dev *dev)
 {
 	//int r = 0;
 	/* power off */
-    DEBUG_NFC("%s: %d \n", __func__, __LINE__);
+    pr_notice("%d \n", __LINE__);
 	if (gpio_is_valid(dev->firm_gpio))
 		gpio_set_value_cansleep(dev->firm_gpio, 0);
 	
-	gpio_set_value_cansleep(dev->ven_gpio, 1);
+	gpio_set_value_cansleep(dev->ven_gpio, 0);
 	msleep(100);
 
 	if(dev->sevdd_reg) regulator_disable(dev->sevdd_reg);
@@ -373,8 +359,8 @@ static long  pn54x_dev_ioctl(struct file *filp, unsigned int cmd,
 				unsigned long arg)
 {
 	struct pn54x_dev *pn54x_dev = filp->private_data;
-	pr_notice("hk %s, cmd=0x%08x, PN544_SET_PWR=0x%08x\n", __func__, cmd, (unsigned int)PN544_SET_PWR);
-	pr_notice("hk %s, cmd=%d, arg=%lu\n", __func__, cmd, arg);
+	pr_notice("%s, cmd=0x%08x, PN544_SET_PWR=0x%08x\n", __func__, cmd, (unsigned int)PN544_SET_PWR);
+	pr_notice("%s, cmd=%d, arg=%lu\n", __func__, cmd, arg);
 	switch (cmd) {
 	case PN544_SET_PWR:
 		if (arg == 2) {
@@ -389,16 +375,15 @@ static long  pn54x_dev_ioctl(struct file *filp, unsigned int cmd,
 			/* power off */
 			pn544_disable(pn54x_dev);
 		} else {
-			pr_err("hk %s bad SET_PWR arg %lu\n", __func__, arg);
+			pr_err("%s bad SET_PWR arg %lu\n", __func__, arg);
 			return -EINVAL;
 		}
 		break;
 	case PN54X_CLK_REQ:
-		pr_notice("hk %s PN54X_CLK_REQ arg arg 2222\n", __func__);
+		pr_notice("%s PN54X_CLK_REQ\n", __func__);
 		if(1 == arg){
 			if(gpio_is_valid(pn54x_dev->clkreq_gpio)){
 				gpio_set_value(pn54x_dev->clkreq_gpio, 1);
-                DEBUG_NFC("%s: %d pn54x_dev->clkreq_gpio %dset 1\n", __func__, __LINE__,pn54x_dev->clkreq_gpio);
 			} else {
 				pr_err("%s Unused Clkreq GPIO %lu\n", __func__, arg);
 				return GPIO_UNUSED;
@@ -406,13 +391,12 @@ static long  pn54x_dev_ioctl(struct file *filp, unsigned int cmd,
 		} else if (0 == arg) {
 			if(gpio_is_valid(pn54x_dev->clkreq_gpio)){
 				gpio_set_value(pn54x_dev->clkreq_gpio, 0);
-                DEBUG_NFC("%s: %d pn54x_dev->clkreq_gpio %dset 0\n", __func__, __LINE__,pn54x_dev->clkreq_gpio);
 			} else {
 				pr_err("%s Unused Clkreq GPIO %lu\n", __func__, arg);
 				return GPIO_UNUSED;
 			}
 		} else {
-			pr_err("hk %s bad CLK_REQ arg %lu\n", __func__, arg);
+			pr_err("%s bad CLK_REQ arg %lu\n", __func__, arg);
 			return -EINVAL;
 		}
 		break;
@@ -420,7 +404,7 @@ static long  pn54x_dev_ioctl(struct file *filp, unsigned int cmd,
 		pr_err("%s bad ioctl %u\n", __func__, cmd);
 		return -EINVAL;
 	}
-	pr_notice("%s: SUCCESS return 0\n", __func__);
+	pr_notice("%s: SUCCESS\n", __func__);
 	return 0;
 }
 
@@ -448,27 +432,51 @@ static int pn54x_get_pdata(struct device *dev,
 	struct device_node *node;
 	u32 flags;
 	int val;
+    struct pinctrl_state *pctls;
 
 	/* make sure there is actually a device tree node */
 	node = dev->of_node;
-    DEBUG_NFC("%s: %d\n", __func__, __LINE__);
 	if (!node)
 		return -ENODEV;
 
 	memset(pdata, 0, sizeof(*pdata));
 
+    pdata->pctl = devm_pinctrl_get(dev);
+    if (IS_ERR(pdata->pctl)) {
+        if (PTR_ERR(pdata->pctl) == -EPROBE_DEFER) {
+            dev_err(dev, "pin ctl critical error!\n");
+        }
+
+        pr_notice("pin control isn't used\n");
+        pdata->pctl = 0;
+    }
+
+    if (pdata->pctl) {
+        pctls = pinctrl_lookup_state(pdata->pctl, "nfc_active");
+        if (IS_ERR(pctls)) {
+            dev_err(dev, "failure to get pinctrl active state\n");
+            pr_notice("pin control isn't used\n");
+            pdata->pctl = 0;
+        } else {
+            if (pinctrl_select_state(pdata->pctl, pctls)) {
+                dev_err(dev, "failure to set pinctrl active state\n");
+                pr_notice("pin control isn't used\n");
+                pdata->pctl = 0;
+            }
+        }
+    }
 	/* ven pin - enable's power to the chip - REQUIRED */
 	val = of_get_named_gpio_flags(node, "qcom,nxq-ven", 0, &flags);
 	if (val >= 0) {
 		pdata->ven_gpio = val;
 	}
 	else {
-		dev_err(dev, "hk 1 VEN GPIO error getting from OF node\n");
+		dev_err(dev, "VEN GPIO error getting from OF node\n");
 		return val;
 	}
 
 	/* firm pin - controls firmware download - OPTIONAL */
-	val = of_get_named_gpio_flags(node, "firmware-gpios", 0, &flags);
+	val = of_get_named_gpio_flags(node, "qcom,nxq-firm", 0, &flags);
 	if (val >= 0) {
 		pdata->firm_gpio = val;
 	}
@@ -603,7 +611,6 @@ static int pn54x_probe(struct i2c_client *client,
 		client->irq = ret;
 	}
 
-	DEBUG_NFC("%s: request ven_gpio %d\n", __func__, pdata->ven_gpio);
 	ret = gpio_request(pdata->ven_gpio, "nfc_ven");
 	if (ret){
 		pr_err("%s :not able to get GPIO ven_gpio\n", __func__);
@@ -611,7 +618,6 @@ static int pn54x_probe(struct i2c_client *client,
 	}
 
 	if (gpio_is_valid(pdata->firm_gpio)) {
-		DEBUG_NFC("%s: request firm_gpio %d\n", __func__, pdata->firm_gpio);
 		ret = gpio_request(pdata->firm_gpio, "nfc_firm");
 		if (ret){
 			pr_err("%s :not able to get GPIO firm_gpio\n", __func__);
@@ -620,7 +626,6 @@ static int pn54x_probe(struct i2c_client *client,
 	}
 
 	if (gpio_is_valid(pdata->clkreq_gpio)) {
-		DEBUG_NFC("%s: request clkreq_gpio %d\n", __func__, pdata->clkreq_gpio);
 		ret = gpio_request(pdata->clkreq_gpio, "nfc_clkreq");
 		if (ret){
 			pr_err("%s :not able to get GPIO clkreq_gpio\n", __func__);
@@ -653,14 +658,14 @@ static int pn54x_probe(struct i2c_client *client,
 		pr_err("%s :not able to set irq_gpio as input\n", __func__);
 		goto err_exit;
 	}
+    gpio_export(pn54x_dev->irq_gpio, 0);
 
 	ret = gpio_direction_output(pn54x_dev->ven_gpio, 0);
 	if (ret < 0) {
 		pr_err("%s : not able to set ven_gpio as output\n", __func__);
 		goto err_exit;
 	}
-	
-	
+    gpio_export(pn54x_dev->ven_gpio, 0);
 
 	if (gpio_is_valid(pn54x_dev->firm_gpio)) {
 		ret = gpio_direction_output(pn54x_dev->firm_gpio, 0);
@@ -670,6 +675,7 @@ static int pn54x_probe(struct i2c_client *client,
 			goto err_exit;
 		}
 	}
+    gpio_export(pn54x_dev->firm_gpio, 0);
 
 	if (gpio_is_valid(pn54x_dev->clkreq_gpio)) {
 		ret = gpio_direction_output(pn54x_dev->clkreq_gpio, 0);

@@ -204,7 +204,6 @@
 	focaltech,key-y-coords = <1340 1340 1340>;
 	focaltech,key-x-coords = <150 330 660>;
     };
-*/
 	pn548@28 {
 		compatible = "qcom,pn548";
 		reg = <0x28>;
@@ -225,6 +224,7 @@
 		clock-names = "ref_clk";
 		status = "ok";
 	};
+*/
 };
 
 &i2c_5 { /* BLSP2 QUP1 (NFC) */

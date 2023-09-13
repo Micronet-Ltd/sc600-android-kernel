@@ -1721,7 +1721,8 @@ static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
                 gpio_direction_input(id);
                 err = gpio_get_value(id);
                 devm_gpio_free(&pdev->dev, id);
-                ctrl_pdata->vdd_l = (err)?2800000:3300000;
+                ctrl_pdata->vdd_l = /*(err)?2850000:3300000;*/2850000;
+                pr_notice("%s: force vdd to 2850000\n", __func__);
             } else {
                 long fd;
                 char bid[2];
@@ -1729,7 +1730,7 @@ static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
                 pr_notice("%s: mcn,board-id-0 is busy, try get from board id\n", __func__);
 
                 bid[1] = 0;
-                ctrl_pdata->vdd_l = 3300000;
+                ctrl_pdata->vdd_l = 2850000;
                 fd = sys_open("/proc/board_id", O_RDONLY, 0);
                 if (fd >= 0) {
                     sys_read(fd, bid, 1);
@@ -1737,7 +1738,9 @@ static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
                     err = kstrtou32(bid, 16, &id);
                     if (err >= 0) {
                         if (id & 1) {
-                            ctrl_pdata->vdd_l = 2800000;
+                            ctrl_pdata->vdd_l = 2850000;
+                        } else {
+                            ctrl_pdata->vdd_l = 3300000;
                         }
                     }
                 }
@@ -4295,9 +4298,11 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 
 	ctrl_pdata->rst_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 			 "qcom,platform-reset-gpio", 0);
-	if (!gpio_is_valid(ctrl_pdata->rst_gpio))
+	if (!gpio_is_valid(ctrl_pdata->rst_gpio)) {
 		pr_err("%s:%d, reset gpio not specified\n",
-						__func__, __LINE__);
+                        __func__, __LINE__);
+        ctrl_pdata->rst_gpio = -1;
+    }
 
 	if (pinfo->mode_gpio_state != MODE_GPIO_NOT_VALID) {
 

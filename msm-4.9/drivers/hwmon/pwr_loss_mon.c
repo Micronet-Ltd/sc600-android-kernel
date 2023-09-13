@@ -332,8 +332,14 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
         if (pwrl->vbatt > -1) {
             pwrl->vbatt = VBATT_IS_DCDC;
             if (gpio_is_valid(pwrl->pwr_lost_batt_chg_pin)) {
-                pr_notice("allow BATTERY_CHARGE\n");
-                gpio_set_value(pwrl->pwr_lost_batt_chg_pin, !pwrl->pwr_lost_batt_chg_l);
+                if (pwrl->batt_is_scap) {
+                    pr_notice("BATTERY_CHARGE forbidden - has no battery\n");
+                    val = pwrl->pwr_lost_batt_chg_l;
+                } else {
+                    pr_notice("allow BATTERY_CHARGE\n");
+                    val = !pwrl->pwr_lost_batt_chg_l;
+                }
+                gpio_set_value(pwrl->pwr_lost_batt_chg_pin, val);
             }
             if (pwrl->main_psy) {
                 prop.intval = 1;
@@ -351,8 +357,13 @@ static void __ref pwr_loss_mon_work(struct work_struct *work)
                 power_supply_set_property(pwrl->otg_psy, POWER_SUPPLY_PROP_SCOPE, &prop);
             }
             if (pwrl->bat_psy) {
-                prop.intval = 0;
-                pr_notice("resume charging\n");
+                if (pwrl->batt_is_scap) {
+                    pr_notice("charging forbidden - has no battery\n");
+                    prop.intval = 1;
+                } else {
+                    pr_notice("resume charging\n");
+                    prop.intval = 0;
+                }
                 power_supply_set_property(pwrl->bat_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &prop);
             }
         }

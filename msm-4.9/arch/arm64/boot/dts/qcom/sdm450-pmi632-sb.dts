@@ -28,10 +28,55 @@
 	cd-gpios = <&tlmm 133 GPIO_ACTIVE_HIGH>;
 };
 
+&i2c_2 {
+	status = "ok";
+	pn548@29 {
+		compatible = "qcom,pn548";
+		reg = <0x29>;
+
+		qcom,nxq-irq = <&tlmm 90 0x00>;
+		qcom,nxq-ven = <&tlmm 9 0x00>;
+		qcom,nxq-firm = <&tlmm 8 0x00>;
+		qcom,nq-clkreq = <&pm8953_gpios 2 0x00>;
+		interrupt-parent = <&tlmm>;
+		qcom,clk-src = "BBCLK2";
+		interrupts = <&tlmm 90 0>;
+		interrupt-names = "nfc_irq";
+		pinctrl-names = "nfc_active", "nfc_suspend";
+		pinctrl-0 = <&nfc_int_active &nfc_disable_active>;
+		pinctrl-1 = <&nfc_int_suspend &nfc_disable_suspend>;
+		clocks = <&clock_gcc clk_bb_clk2_pin>;
+		clock-names = "ref_clk";
+		status = "ok";
+	};
+};
+
+&spi_6 { /* BLSP2 QUP2 (CAN) */
+	status = "ok";
+	can0:mcp25625@0 {
+		status = "ok";
+		compatible = "microchip,mcp25625";
+		reg = <0x0>;
+		spi-max-frequency = <9600000>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <&tlmm 66 IRQ_TYPE_LEVEL_LOW>;
+		oscillator-frequency = <20000000>;
+		/*clocks = <&can_osc_fixed>;*/
+		/*avdd-supply = <&pm8916_lx>;
+		dvdd-supply = <&pm8916_lx>;*/
+		mcp25625,irq-pin = <&tlmm 44 GPIO_ACTIVE_LOW>;
+		mcp25625,reset-pin = <&tlmm 33 GPIO_ACTIVE_LOW>;
+		mcp25625,standby-pin = <&tlmm 66 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "mcp25625_standby_active","mcp25625_standby_suspend";
+		pinctrl-0 = <&mcp25625_int_active &mcp25625_standby_active>;
+		pinctrl-1 = <&mcp25625_int_suspend &mcp25625_standby_suspend>;
+	};
+};
+
 &pm8953_l17 {
-	regulator-min-microvolt = <3000000>;
-	regulator-max-microvolt = <3300000>;
-	qcom,init-voltage = <3000000>;
+	regulator-min-microvolt = <2850000>;
+	regulator-max-microvolt = <2850000>;
+	qcom,init-voltage = <2850000>;
 };
 
 &soc {
@@ -68,14 +113,15 @@
 	dock {
 		compatible = "mcn,sb-dock-switch";
 		pinctrl-names = "dock_pins_active", "dock_pin_suspend";
-		pinctrl-0 = <&dock_pins_active>;
-		pinctrl-1 = <&dock_pin_suspend>;
+		pinctrl-0 = <&dock_pins_active &alps_pins_active>;
+		pinctrl-1 = <&dock_pin_suspend &alps_pin_suspend>;
 		mcn,aout-0 = <&tlmm 131 GPIO_ACTIVE_HIGH>;
 		mcn,aout-1 = <&tlmm 19 GPIO_ACTIVE_HIGH>;
 		mcn,dock-pin = <&tlmm 97 GPIO_ACTIVE_HIGH>;
-		interrupt-names = "ignition-changed";
+		mcn,2s-light-pin = <&tlmm 43 GPIO_ACTIVE_LOW>;
+		interrupt-names = "ignition-changed", "light-changed";
 		interrupt-parent = <&tlmm>;
-		interrupts = <&tlmm 97 0>;
+		interrupts = <&tlmm 97 IRQ_TYPE_EDGE_BOTH>, <&tlmm 43 IRQ_TYPE_EDGE_BOTH>;
 		tuner-supply = <&pm8953_l10>;
 		ldoa2-supply = <&pm8953_l2>;
 		ldoa6-supply = <&pm8953_l6>;
@@ -103,7 +149,7 @@
 		pinctrl-0 = <&pwr_loss_mon_active &pwr_loss_batt_empty_active>;
 		pinctrl-1 = <&pwr_loss_mon_suspend &pwr_loss_batt_empty_suspend>;
 		mcn,pwr-loss-mon = <&tlmm 18 GPIO_ACTIVE_LOW>;
-		mcn,pwr-batt-empty = <&tlmm 21 GPIO_ACTIVE_LOW>;
+		mcn,pwr-batt-empty = <&tlmm 61 GPIO_ACTIVE_LOW>;
 		mcn,pwr-batt-chg = <&tlmm 89 GPIO_ACTIVE_LOW>;
 		mcn,wan-off-delay = <0>;
 		mcn,wlan-off-delay = <0>;

@@ -244,7 +244,7 @@ enum mcp251x_model {
 };
 
 //#define MAX_QUE 0
-#define MAX_QUE 256
+#define MAX_QUE 2056
 #if MAX_QUE
 struct frame_queue {
     int head;
@@ -963,12 +963,26 @@ static void mcp251x_error_skb(struct net_device *net, int can_id, int data1)
 {
 	struct sk_buff *skb;
 	struct can_frame *frame;
+    struct mcp251x_priv *priv = netdev_priv(net);
+    unsigned long flags;
+    int full = 0;
 
 	skb = alloc_can_err_skb(net, &frame);
 	if (skb) {
 		frame->can_id |= can_id;
 		frame->data[1] = data1;
-		netif_rx_ni(skb);
+
+        spin_lock_irqsave(&priv->rx_frames_q.frame_queue_lock, flags);
+        full = frames_queue_put(&priv->rx_frames_q, frame);
+        if (MAX_QUE == full) {
+            priv->net->stats.rx_dropped++;
+        }
+        spin_unlock_irqrestore(&priv->rx_frames_q.frame_queue_lock, flags);
+        if (full) {
+            queue_work(priv->wq, &priv->q_work);
+            //dev_notice(&spi->dev, "frame que is mostly full [%d] %lld\n", full, ktime_to_us(ktime_get()));
+        }
+//		netif_rx_ni(skb);
 	} else {
 		netdev_err(net, "cannot allocate error skb\n");
 	}

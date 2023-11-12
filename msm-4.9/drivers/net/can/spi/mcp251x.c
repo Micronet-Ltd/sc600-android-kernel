@@ -244,7 +244,7 @@ enum mcp251x_model {
 };
 
 //#define MAX_QUE 0
-#define MAX_QUE 2056
+#define MAX_QUE 2048
 #if MAX_QUE
 struct frame_queue {
     int head;
@@ -510,7 +510,7 @@ int frames_queue_put(struct frame_queue *queue, struct can_frame *frame)
     }
  
     if (frame) {
-        memset(&queue->rx_frame[queue->head], 0, sizeof(*frame));
+        //memset(&queue->rx_frame[queue->head], 0, sizeof(*frame));
         memcpy(&queue->rx_frame[queue->head], frame, sizeof(*frame));
     }
 
@@ -571,6 +571,7 @@ static int mcp251x_hw_rx(struct spi_device *spi, int buf_idx)
 static void mcp251x_hw_rx_skb(struct spi_device *spi)
 {
     unsigned long flags;
+    int err;
 	struct mcp251x_priv *priv = spi_get_drvdata(spi);
 	struct sk_buff *skb;
 	struct can_frame *frame, *frame_q;
@@ -594,7 +595,10 @@ static void mcp251x_hw_rx_skb(struct spi_device *spi)
         priv->net->stats.rx_packets++;
         priv->net->stats.rx_bytes += frame->can_dlc;
 
-        netif_rx_ni(skb);
+        err = netif_rx_ni(skb);
+        if (err) {
+            dev_err(&spi->dev, "cannot que skb [%x, %d]\n", frame->can_id, err);
+        }
     }
 }
 #else

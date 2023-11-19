@@ -244,7 +244,7 @@ enum mcp251x_model {
 };
 
 //#define MAX_QUE 0
-#define MAX_QUE 2048
+#define MAX_QUE 3072
 #if MAX_QUE
 struct frame_queue {
     int head;
@@ -499,7 +499,7 @@ int frames_queue_put(struct frame_queue *queue, struct can_frame *frame)
         full = sizeof(queue->rx_frame)/sizeof(queue->rx_frame[0]) - queue->tail + queue->head;
     }
 
-    if (full < 2*MAX_QUE/3) {
+    if (full < MAX_QUE - 32) {
         full = 0; 
     }
 
@@ -1860,19 +1860,20 @@ static int __maybe_unused mcp251x_can_suspend(struct device *dev)
 		netif_device_detach(net);
 
 		mcp251x_hw_sleep(spi);
-        if (gpio_is_valid(priv->pdata->standby_pin)) {
-            gpio_set_value(priv->pdata->standby_pin, priv->pdata->standby_l);
-        }
 		mcp251x_power_enable(priv->transceiver, 0);
 		priv->after_suspend = AFTER_SUSPEND_UP;
 	} else {
 		priv->after_suspend = AFTER_SUSPEND_DOWN;
 	}
 
+    if (gpio_is_valid(priv->pdata->standby_pin)) {
+        gpio_set_value(priv->pdata->standby_pin, priv->pdata->standby_l);
+    }
+
 	if (!IS_ERR_OR_NULL(priv->power)) {
-        if (gpio_is_valid(priv->pdata->reset_pin)) {
-            gpio_set_value(priv->pdata->reset_pin, priv->pdata->reset_l);
-        }
+//        if (gpio_is_valid(priv->pdata->reset_pin)) {
+//            gpio_set_value(priv->pdata->reset_pin, priv->pdata->reset_l);
+//        }
 		regulator_disable(priv->power);
 		priv->after_suspend |= AFTER_SUSPEND_POWER;
 	}
@@ -1886,9 +1887,9 @@ static int __maybe_unused mcp251x_can_resume(struct device *dev)
 	struct mcp251x_priv *priv = spi_get_drvdata(spi);
 
 	if (priv->after_suspend & AFTER_SUSPEND_POWER){
-        if (gpio_is_valid(priv->pdata->reset_pin)) {
-            gpio_set_value(priv->pdata->reset_pin, !priv->pdata->reset_l);
-        }
+//        if (gpio_is_valid(priv->pdata->reset_pin)) {
+//            gpio_set_value(priv->pdata->reset_pin, !priv->pdata->reset_l);
+//        }
 		mcp251x_power_enable(priv->power, 1);
     }
 

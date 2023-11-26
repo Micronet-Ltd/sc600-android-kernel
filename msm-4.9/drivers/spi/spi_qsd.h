@@ -376,6 +376,10 @@ struct msm_spi {
 	struct pinctrl_state	*pins_sleep;
 	bool			is_init_complete;
 	bool			pack_words;
+    struct spi_master *master;
+	struct list_head   xfrs_queue;
+	struct work_struct xfrs_work;
+    struct workqueue_struct *xfrs_wq;
 };
 
 /* Forward declaration */

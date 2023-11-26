@@ -1848,6 +1848,139 @@ err_setup_exit:
 	return rc;
 }
 
+static void msm_spi_xfrs_work(struct work_struct *work)
+{
+    unsigned long flags;
+    int err;
+    struct msm_spi	    *dd;
+    struct spi_master   *master;
+    struct spi_message  *m;
+    struct spi_transfer	*t = 0;
+
+	dd = container_of(work, struct msm_spi, xfrs_work);
+    master = dd->master;
+
+    dev_notice(dd->dev, "handle transfers\n");
+
+    err = msm_spi_prepare_transfer_hardware(master);
+    if (err) {
+        dev_err(dd->dev, "failure to resume spi\n");
+    }
+
+	while (!list_empty(&dd->xfrs_queue)) {
+		m = container_of(dd->xfrs_queue.next, struct spi_message, queue);
+        spin_lock_irqsave(&dd->queue_lock, flags);
+		list_del_init(&m->queue);
+        master->busy = 1;
+        spin_unlock_irqrestore(&dd->queue_lock, flags);
+        msm_spi_set_cs(m->spi, 1);
+
+        list_for_each_entry(t, &m->transfers, transfer_list) {
+            // transfer one
+            if (t->speed_hz > dd->pdata->max_clock_speed ||
+                (t->bits_per_word && (t->bits_per_word < 4 || t->bits_per_word > 32)) ||
+                (!t->tx_buf && !t->rx_buf)) {
+                dev_err(dd->dev,
+                    "Invalid transfer: %d Hz, %d bpw tx=%pK, rx=%pK\n",
+                    t->speed_hz, t->bits_per_word, t->tx_buf, t->rx_buf);
+                err = -EINVAL;
+                break;
+            }
+            if (dd->suspended || !msm_spi_is_valid_state(dd)) {
+                dev_err(dd->dev, "%s: SPI operational state not valid\n",
+                    __func__);
+                err = ~EIO;
+                break;
+            }
+
+            spin_lock_irqsave(&dd->queue_lock, flags);
+            dd->transfer_pending = 1;
+            dd->spi = m->spi;
+            dd->cur_transfer = t;
+            spin_unlock_irqrestore(&dd->queue_lock, flags);
+
+            mutex_lock(&dd->core_lock);
+            err = msm_spi_process_transfer(dd);
+            mutex_unlock(&dd->core_lock);
+
+            spin_lock_irqsave(&dd->queue_lock, flags);
+            dd->transfer_pending = 0;
+            spin_unlock_irqrestore(&dd->queue_lock, flags);
+
+            if (dd->suspended)
+                wake_up_interruptible(&dd->continue_suspend);
+
+            if (t->delay_usecs)
+                udelay(t->delay_usecs);
+
+            if (t->cs_change) {
+                msm_spi_set_cs(m->spi, 0);
+            }
+        }
+        if (!t->cs_change) {
+            msm_spi_set_cs(m->spi, 0);
+        }
+        spin_lock_irqsave(&dd->queue_lock, flags);
+        master->busy = 0;
+        spin_unlock_irqrestore(&dd->queue_lock, flags);
+
+        m->status = err;
+        m->complete(m->context);
+    }
+
+    dev_notice(dd->dev, "finish transfers\n");
+
+    spin_lock_irqsave(&dd->queue_lock, flags);
+    master->idling = 1;
+    spin_unlock_irqrestore(&dd->queue_lock, flags);
+
+    msm_spi_unprepare_transfer_hardware(master);
+
+    spin_lock_irqsave(&dd->queue_lock, flags);
+    master->idling = 0;
+    spin_unlock_irqrestore(&dd->queue_lock, flags);
+
+    return;
+}
+
+static int msm_spi_transfer(struct spi_device *spi, struct spi_message *m)
+{
+    unsigned long flags;
+	struct msm_spi	*dd;
+//	struct spi_transfer	*t;
+
+	dd = spi_master_get_devdata(spi->master);
+    dev_notice(dd->dev, "xmit\n");
+
+	m->actual_length = 0;
+	m->status = 0;
+
+	if (list_empty(&m->transfers) || !m->complete) {
+        dev_err(dd->dev, "transfers list is empty or incomplete\n");
+		return -EINVAL;
+    }
+/*
+	list_for_each_entry(t, &m->transfers, transfer_list) {
+		if (t->speed_hz > dd->pdata->max_clock_speed ||
+            (t->len && !(t->rx_buf || t->tx_buf)) ||
+            (t->bits_per_word &&
+					(  t->bits_per_word < 4
+					|| t->bits_per_word > 32))) {
+            dev_err(dd->dev, "invalid transfer: [%d Hz, %d bytes %s%s, %d]\n",
+					t->speed_hz, t->len, t->tx_buf?"tx":"", t->rx_buf?"rx":"", t->bits_per_word);
+			return -EINVAL;
+		}
+	}
+*/
+	spin_lock_irqsave(&dd->queue_lock, flags);
+	list_add_tail(&m->queue, &dd->xfrs_queue);
+	queue_work(dd->xfrs_wq, &dd->xfrs_work);
+	spin_unlock_irqrestore(&dd->queue_lock, flags);
+
+	return 0;
+}
+
+
 #ifdef CONFIG_DEBUG_FS
 
 
@@ -2487,6 +2620,14 @@ static int msm_spi_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, master);
 	dd = spi_master_get_devdata(master);
+    dd->master = master;
+
+	INIT_LIST_HEAD(&dd->xfrs_queue);
+	INIT_WORK(&dd->xfrs_work, msm_spi_xfrs_work);
+	dd->xfrs_wq = create_singlethread_workqueue("msm_spi-wq");
+	if (dd->xfrs_wq) {
+        master->transfer = msm_spi_transfer;
+    }
 
 	if (pdev->dev.of_node) {
 		dd->qup_ver = SPI_QUP_VERSION_BFAM;
@@ -2747,6 +2888,7 @@ static int msm_spi_remove(struct platform_device *pdev)
 
 	spi_debugfs_exit(dd);
 	sysfs_remove_group(&pdev->dev.kobj, &dev_attr_grp);
+	destroy_workqueue(dd->xfrs_wq);
 
 	if (dd->dma_teardown)
 		dd->dma_teardown(dd);

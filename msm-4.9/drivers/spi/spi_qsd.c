@@ -143,7 +143,7 @@ static inline int msm_spi_request_gpios(struct msm_spi *dd)
 			__func__, SPI_PINCTRL_STATE_DEFAULT);
 			goto error;
 		}
-        dev_notice(dd->dev, "%s mux selected\n", SPI_PINCTRL_STATE_DEFAULT);
+//        dev_notice(dd->dev, "%s mux selected\n", SPI_PINCTRL_STATE_DEFAULT);
 	}
 	return 0;
 error:
@@ -179,7 +179,7 @@ static inline void msm_spi_free_gpios(struct msm_spi *dd)
 			dev_err(dd->dev, "%s: Can not set %s pins\n",
 			__func__, SPI_PINCTRL_STATE_SLEEP);
         else {
-            dev_notice(dd->dev, "%s mux selected\n", SPI_PINCTRL_STATE_SLEEP);
+//            dev_notice(dd->dev, "%s mux selected\n", SPI_PINCTRL_STATE_SLEEP);
         }
 	}
 }
@@ -1779,7 +1779,7 @@ static int msm_spi_setup(struct spi_device *spi)
 		return -EINVAL;
 	}
 
-    dev_notice(&spi->dev, "SS[%u]\n", spi->chip_select);
+//    dev_notice(&spi->dev, "SS[%u]\n", spi->chip_select);
 	dd = spi_master_get_devdata(spi->master);
 
 	rc = pm_runtime_get_sync(dd->dev);
@@ -1860,7 +1860,7 @@ static void msm_spi_xfrs_work(struct work_struct *work)
 	dd = container_of(work, struct msm_spi, xfrs_work);
     master = dd->master;
 
-    dev_notice(dd->dev, "handle transfers\n");
+//    dev_notice(dd->dev, "handle transfers\n");
 
     err = msm_spi_prepare_transfer_hardware(master);
     if (err) {
@@ -1928,7 +1928,7 @@ static void msm_spi_xfrs_work(struct work_struct *work)
         m->complete(m->context);
     }
 
-    dev_notice(dd->dev, "finish transfers\n");
+//    dev_notice(dd->dev, "finish transfers\n");
 
     spin_lock_irqsave(&dd->queue_lock, flags);
     master->idling = 1;
@@ -1950,7 +1950,7 @@ static int msm_spi_transfer(struct spi_device *spi, struct spi_message *m)
 //	struct spi_transfer	*t;
 
 	dd = spi_master_get_devdata(spi->master);
-    dev_notice(dd->dev, "xmit\n");
+//    dev_notice(dd->dev, "xmit\n");
 
 	m->actual_length = 0;
 	m->status = 0;
@@ -1974,8 +1974,8 @@ static int msm_spi_transfer(struct spi_device *spi, struct spi_message *m)
 */
 	spin_lock_irqsave(&dd->queue_lock, flags);
 	list_add_tail(&m->queue, &dd->xfrs_queue);
-	queue_work(dd->xfrs_wq, &dd->xfrs_work);
-	spin_unlock_irqrestore(&dd->queue_lock, flags);
+    queue_work(dd->xfrs_wq, &dd->xfrs_work);
+    spin_unlock_irqrestore(&dd->queue_lock, flags);
 
 	return 0;
 }
@@ -2318,8 +2318,8 @@ static int msm_spi_dt_to_pdata_populate(struct platform_device *pdev,
 			ret = -EBADE;
 		}
 
-		dev_notice(&pdev->dev, "DT entry ret:%d name:%s val:%d\n",
-				ret, itr->dt_name, *((int *)itr->ptr_data));
+//		dev_notice(&pdev->dev, "DT entry ret:%d name:%s val:%d\n",
+//				ret, itr->dt_name, *((int *)itr->ptr_data));
 
 		if (ret) {
 			*((int *)itr->ptr_data) = itr->default_val;

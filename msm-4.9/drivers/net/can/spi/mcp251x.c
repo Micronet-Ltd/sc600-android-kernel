@@ -1682,7 +1682,7 @@ static int mcp251x_can_probe(struct spi_device *spi)
 		goto out_clk;
 	}
 
-    dev_notice(&spi->dev, "power up, wake and reamin reset inactive\n");
+    dev_notice(&spi->dev, "power up, wake and remain reset inactive\n");
     if (gpio_is_valid(pdata->reset_pin)) {
         gpio_set_value(pdata->reset_pin, !pdata->reset_l);
     }

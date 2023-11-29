@@ -6,8 +6,13 @@ ifeq ($(TARGET_BUILD_VARIANT),user)
 $(obj)/dba_dsi1_bridge.o: $(srctree)/$(obj)/dba_dsi1_bridge_id.user FORCE
 	cp $(srctree)/$(obj)/dba_dsi1_bridge_id.user $(obj)/dba_dsi1_bridge.o
 else
+ifeq ($(CONFIG_FUNCTION_TRACER),y)
 $(obj)/dba_dsi1_bridge.o: $(srctree)/$(obj)/dba_dsi1_bridge_id FORCE
 	cp $(srctree)/$(obj)/dba_dsi1_bridge_id $(obj)/dba_dsi1_bridge.o
+else
+$(obj)/dba_dsi1_bridge.o: $(srctree)/$(obj)/dba_dsi1_bridge_id.user FORCE
+	cp $(srctree)/$(obj)/dba_dsi1_bridge_id.user $(obj)/dba_dsi1_bridge.o
+endif
 endif
 clean:
 	rm *.o

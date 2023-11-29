@@ -719,6 +719,7 @@
 		qcom,use-bam;
 		qcom,use-pinctrl;
 		qcom,ver-reg-exists;
+		qcom,rt-priority;
 		qcom,bam-consumer-pipe-index = <6>;
 		qcom,bam-producer-pipe-index = <7>;
 		qcom,master-id = <84>;

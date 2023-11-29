@@ -1848,6 +1848,7 @@ err_setup_exit:
 	return rc;
 }
 
+#if SPI_USE_TRANSFER
 static void msm_spi_xfrs_work(struct work_struct *work)
 {
     unsigned long flags;
@@ -1979,7 +1980,7 @@ static int msm_spi_transfer(struct spi_device *spi, struct spi_message *m)
 
 	return 0;
 }
-
+#endif
 
 #ifdef CONFIG_DEBUG_FS
 
@@ -2620,15 +2621,16 @@ static int msm_spi_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, master);
 	dd = spi_master_get_devdata(master);
+#if SPI_USE_TRANSFER
     dd->master = master;
 
 	INIT_LIST_HEAD(&dd->xfrs_queue);
 	INIT_WORK(&dd->xfrs_work, msm_spi_xfrs_work);
 	dd->xfrs_wq = create_singlethread_workqueue("msm_spi-wq");
 	if (dd->xfrs_wq) {
-        master->transfer = msm_spi_transfer;
+        //master->transfer = msm_spi_transfer;
     }
-
+#endif
 	if (pdev->dev.of_node) {
 		dd->qup_ver = SPI_QUP_VERSION_BFAM;
 		master->dev.of_node = pdev->dev.of_node;
@@ -2888,8 +2890,9 @@ static int msm_spi_remove(struct platform_device *pdev)
 
 	spi_debugfs_exit(dd);
 	sysfs_remove_group(&pdev->dev.kobj, &dev_attr_grp);
+#if SPI_USE_TRANSFER
 	destroy_workqueue(dd->xfrs_wq);
-
+#endif
 	if (dd->dma_teardown)
 		dd->dma_teardown(dd);
 	pm_runtime_disable(&pdev->dev);

@@ -288,6 +288,7 @@ struct msm_spi_bam {
 	u32			 bam_tx_len;
 };
 
+#define SPI_USE_TRANSFER 0
 struct msm_spi {
 	u8                      *read_buf;
 	const u8                *write_buf;
@@ -376,10 +377,12 @@ struct msm_spi {
 	struct pinctrl_state	*pins_sleep;
 	bool			is_init_complete;
 	bool			pack_words;
+#if SPI_USE_TRANSFER
     struct spi_master *master;
 	struct list_head   xfrs_queue;
 	struct work_struct xfrs_work;
     struct workqueue_struct *xfrs_wq;
+#endif
 };
 
 /* Forward declaration */

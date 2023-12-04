@@ -1719,6 +1719,9 @@ static int msm_spi_transfer_one(struct spi_master *master,
 	mutex_unlock(&dd->core_lock);
 	if (dd->suspended)
 		wake_up_interruptible(&dd->continue_suspend);
+
+    spi_finalize_current_transfer(master);
+
 	return status_error;
 }
 

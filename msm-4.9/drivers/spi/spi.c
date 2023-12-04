@@ -1014,7 +1014,8 @@ static int spi_transfer_one_message(struct spi_master *master,
 				ret = 0;
 				ms = 8LL * 1000LL * xfer->len;
 				do_div(ms, xfer->speed_hz);
-				ms += ms + 200; /* some tolerance */
+			//	ms += ms + 200; /* some tolerance */
+                ms += 200; /* some tolerance */
 
 				if (ms > UINT_MAX)
 					ms = UINT_MAX;
@@ -1237,8 +1238,8 @@ out:
 	mutex_unlock(&master->io_mutex);
 
 	/* Prod the scheduler in case transfer_one() was busy waiting */
-	if (!ret)
-		cond_resched();
+	//if (!ret)
+	//	cond_resched();
 }
 
 /**
@@ -1255,7 +1256,7 @@ static void spi_pump_messages(struct kthread_work *work)
 
 static int spi_init_queue(struct spi_master *master)
 {
-	struct sched_param param = { .sched_priority = 20 /*MAX_RT_PRIO - 1*/ };
+	struct sched_param param = { .sched_priority = MAX_RT_PRIO - 1};
 
 	master->running = false;
 	master->busy = false;

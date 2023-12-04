@@ -85,6 +85,7 @@
 #define INSTRUCTION_BIT_MODIFY	0x05
 #define INSTRUCTION_LOAD_TXB(n)	(0x40 + 2 * (n))
 #define INSTRUCTION_READ_RXB(n)	(((n) == 0) ? 0x90 : 0x94)
+#define INSTRUCTION_READ_RXBD(n) (((n) == 0) ? 0x92 : 0x96)
 #define INSTRUCTION_RESET	0xC0
 #define RTS_TXB0		0x01
 #define RTS_TXB1		0x02
@@ -212,6 +213,7 @@
  * frame)
  */
 #define CAN_FRAME_MAX_DATA_LEN	8
+#define CAN_FRAME_ID_DLC_LEN	6
 #define SPI_TRANSFER_BUF_LEN	(6 + CAN_FRAME_MAX_DATA_LEN)
 #define CAN_FRAME_MAX_BITS	128
 
@@ -459,11 +461,10 @@ static void mcp251x_hw_tx(struct spi_device *spi, struct can_frame *frame,
 static void mcp251x_hw_rx_frame(struct spi_device *spi, u8 *buf,
 				int buf_idx)
 {
+    int i, len;
 	struct mcp251x_priv *priv = spi_get_drvdata(spi);
 
 	if (mcp251x_is_2510(spi)) {
-		int i, len;
-
 		for (i = 1; i < RXBDAT_OFF; i++)
 			buf[i] = mcp251x_read_reg(spi, RXBCTRL(buf_idx) + i);
 
@@ -474,6 +475,12 @@ static void mcp251x_hw_rx_frame(struct spi_device *spi, u8 *buf,
 		priv->spi_tx_buf[RXBCTRL_OFF] = INSTRUCTION_READ_RXB(buf_idx);
 		mcp251x_spi_trans(spi, SPI_TRANSFER_BUF_LEN);
 		memcpy(buf, priv->spi_rx_buf, SPI_TRANSFER_BUF_LEN);
+//		mcp251x_spi_trans(spi, CAN_FRAME_ID_DLC_LEN);
+//		memcpy(buf, priv->spi_rx_buf, CAN_FRAME_ID_DLC_LEN);
+//        len = get_can_dlc(buf[RXBDLC_OFF] & RXBDLC_LEN_MASK);
+//        priv->spi_tx_buf[RXBCTRL_OFF] = INSTRUCTION_READ_RXBD(buf_idx);
+//		mcp251x_spi_trans(spi, len);
+//		memcpy(&buf[RXBDAT_OFF], priv->spi_rx_buf, len);
 	}
 }
 

@@ -78,6 +78,10 @@
 #include <linux/spi/spi.h>
 #include <linux/uaccess.h>
 #include <linux/regulator/consumer.h>
+#include <linux/irq.h>
+//#include <linux/of_irq.h>
+#include <linux/sched.h>
+#include <linux/sched/rt.h>
 
 /* SPI interface instruction set */
 #define INSTRUCTION_WRITE	0x02
@@ -246,7 +250,7 @@ enum mcp251x_model {
 };
 
 //#define MAX_QUE 0
-#define MAX_QUE 3072
+#define MAX_QUE 512
 #if MAX_QUE
 struct frame_queue {
     int head;
@@ -1307,6 +1311,17 @@ static int mcp251x_open(struct net_device *net)
 		close_candev(net);
 		goto open_unlock;
 	}
+
+#if 1
+{
+    struct irq_desc *irq_desc;
+    irq_desc = irq_to_desc(priv->pdata->irq);
+    if (irq_desc) {
+        struct sched_param param = {.sched_priority = MAX_RT_PRIO - 2};
+        sched_setscheduler(irq_desc->action->thread, SCHED_FIFO, &param);
+    }
+}
+#endif
 
 	priv->wq = alloc_workqueue("mcp251x_wq", WQ_FREEZABLE | WQ_MEM_RECLAIM, 0);
 	INIT_WORK(&priv->tx_work, mcp251x_tx_work_handler);

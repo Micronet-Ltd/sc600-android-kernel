@@ -78,6 +78,10 @@
 #include <linux/spi/spi.h>
 #include <linux/uaccess.h>
 #include <linux/regulator/consumer.h>
+#include <linux/irq.h>
+//#include <linux/of_irq.h>
+#include <linux/sched.h>
+#include <linux/sched/rt.h>
 
 /* SPI interface instruction set */
 #define INSTRUCTION_WRITE	0x02
@@ -85,6 +89,7 @@
 #define INSTRUCTION_BIT_MODIFY	0x05
 #define INSTRUCTION_LOAD_TXB(n)	(0x40 + 2 * (n))
 #define INSTRUCTION_READ_RXB(n)	(((n) == 0) ? 0x90 : 0x94)
+#define INSTRUCTION_READ_RXBD(n) (((n) == 0) ? 0x92 : 0x96)
 #define INSTRUCTION_RESET	0xC0
 #define RTS_TXB0		0x01
 #define RTS_TXB1		0x02
@@ -212,6 +217,7 @@
  * frame)
  */
 #define CAN_FRAME_MAX_DATA_LEN	8
+#define CAN_FRAME_ID_DLC_LEN	6
 #define SPI_TRANSFER_BUF_LEN	(6 + CAN_FRAME_MAX_DATA_LEN)
 #define CAN_FRAME_MAX_BITS	128
 
@@ -244,7 +250,7 @@ enum mcp251x_model {
 };
 
 //#define MAX_QUE 0
-#define MAX_QUE 3072
+#define MAX_QUE 512
 #if MAX_QUE
 struct frame_queue {
     int head;
@@ -459,11 +465,10 @@ static void mcp251x_hw_tx(struct spi_device *spi, struct can_frame *frame,
 static void mcp251x_hw_rx_frame(struct spi_device *spi, u8 *buf,
 				int buf_idx)
 {
+    int i, len;
 	struct mcp251x_priv *priv = spi_get_drvdata(spi);
 
 	if (mcp251x_is_2510(spi)) {
-		int i, len;
-
 		for (i = 1; i < RXBDAT_OFF; i++)
 			buf[i] = mcp251x_read_reg(spi, RXBCTRL(buf_idx) + i);
 
@@ -474,6 +479,12 @@ static void mcp251x_hw_rx_frame(struct spi_device *spi, u8 *buf,
 		priv->spi_tx_buf[RXBCTRL_OFF] = INSTRUCTION_READ_RXB(buf_idx);
 		mcp251x_spi_trans(spi, SPI_TRANSFER_BUF_LEN);
 		memcpy(buf, priv->spi_rx_buf, SPI_TRANSFER_BUF_LEN);
+//		mcp251x_spi_trans(spi, CAN_FRAME_ID_DLC_LEN);
+//		memcpy(buf, priv->spi_rx_buf, CAN_FRAME_ID_DLC_LEN);
+//        len = get_can_dlc(buf[RXBDLC_OFF] & RXBDLC_LEN_MASK);
+//        priv->spi_tx_buf[RXBCTRL_OFF] = INSTRUCTION_READ_RXBD(buf_idx);
+//		mcp251x_spi_trans(spi, len);
+//		memcpy(&buf[RXBDAT_OFF], priv->spi_rx_buf, len);
 	}
 }
 
@@ -1083,6 +1094,7 @@ static irqreturn_t mcp251x_can_ist(int irq, void *dev_id)
 
 #if MAX_QUE
     disable_irq_nosync(irq);
+//    local_irq_disable
 #endif
 
     mutex_lock(&priv->mcp_lock);
@@ -1300,6 +1312,17 @@ static int mcp251x_open(struct net_device *net)
 		close_candev(net);
 		goto open_unlock;
 	}
+
+#if 1
+{
+    struct irq_desc *irq_desc;
+    irq_desc = irq_to_desc(priv->pdata->irq);
+    if (irq_desc) {
+        struct sched_param param = {.sched_priority = MAX_RT_PRIO - 2};
+        sched_setscheduler(irq_desc->action->thread, SCHED_FIFO, &param);
+    }
+}
+#endif
 
 	priv->wq = alloc_workqueue("mcp251x_wq", WQ_FREEZABLE | WQ_MEM_RECLAIM, 0);
 	INIT_WORK(&priv->tx_work, mcp251x_tx_work_handler);
@@ -1682,7 +1705,7 @@ static int mcp251x_can_probe(struct spi_device *spi)
 		goto out_clk;
 	}
 
-    dev_notice(&spi->dev, "power up, wake and reamin reset inactive\n");
+    dev_notice(&spi->dev, "power up, wake and remain reset inactive\n");
     if (gpio_is_valid(pdata->reset_pin)) {
         gpio_set_value(pdata->reset_pin, !pdata->reset_l);
     }

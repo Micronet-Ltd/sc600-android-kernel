@@ -1094,6 +1094,7 @@ static irqreturn_t mcp251x_can_ist(int irq, void *dev_id)
 
 #if MAX_QUE
     disable_irq_nosync(irq);
+//    local_irq_disable
 #endif
 
     mutex_lock(&priv->mcp_lock);

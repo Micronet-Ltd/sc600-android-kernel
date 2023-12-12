@@ -80,6 +80,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/irq.h>
 //#include <linux/of_irq.h>
+#include <linux/irqflags.h>
 #include <linux/sched.h>
 #include <linux/sched/rt.h>
 
@@ -1094,7 +1095,7 @@ static irqreturn_t mcp251x_can_ist(int irq, void *dev_id)
 
 #if MAX_QUE
     disable_irq_nosync(irq);
-//    local_irq_disable
+    local_irq_disable();
 #endif
 
     mutex_lock(&priv->mcp_lock);
@@ -1257,6 +1258,7 @@ static irqreturn_t mcp251x_can_ist(int irq, void *dev_id)
     mutex_unlock(&priv->mcp_lock);
 
 #if MAX_QUE
+    arch_local_irq_enable();
     enable_irq(priv->pdata->irq);
 #endif
 
@@ -1313,7 +1315,7 @@ static int mcp251x_open(struct net_device *net)
 		goto open_unlock;
 	}
 
-#if 1
+#if 0
 {
     struct irq_desc *irq_desc;
     irq_desc = irq_to_desc(priv->pdata->irq);

@@ -1095,7 +1095,7 @@ static irqreturn_t mcp251x_can_ist(int irq, void *dev_id)
 
 #if MAX_QUE
     disable_irq_nosync(irq);
-    local_irq_disable();
+//    local_irq_disable();
 #endif
 
     mutex_lock(&priv->mcp_lock);
@@ -1130,8 +1130,19 @@ static irqreturn_t mcp251x_can_ist(int irq, void *dev_id)
 			 */
 			if (mcp251x_is_2510(spi))
 				mcp251x_write_bits(spi, CANINTF, CANINTF_RX0IF, 0x00);
-            else
-                clear_intf |= CANINTF_RX0IF;
+            //else
+            //    clear_intf |= CANINTF_RX0IF;
+
+			// check if frame is rxed in buffer 1 while buffer 0 was hadling
+			if (!(intf & CANINTF_RX1IF)) {
+				u8 intf1, eflag1;
+
+				// read intf again to avoid a race condition */
+				mcp251x_read_2regs(spi, CANINTF, &intf1, &eflag1);
+
+				intf |= intf1;
+				eflag |= eflag1;
+			}
 		}
 
 		/* receive buffer 1 */
@@ -1141,7 +1152,7 @@ static irqreturn_t mcp251x_can_ist(int irq, void *dev_id)
 #endif
             mcp251x_hw_rx(spi, 1);
 			/* The MCP2515/25625 does this automatically. */
-			//if (mcp251x_is_2510(spi))
+			if (mcp251x_is_2510(spi))
 				clear_intf |= CANINTF_RX1IF;
 		}
 
@@ -1258,7 +1269,7 @@ static irqreturn_t mcp251x_can_ist(int irq, void *dev_id)
     mutex_unlock(&priv->mcp_lock);
 
 #if MAX_QUE
-    arch_local_irq_enable();
+//    arch_local_irq_enable();
     enable_irq(priv->pdata->irq);
 #endif
 

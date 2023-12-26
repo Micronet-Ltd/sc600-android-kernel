@@ -83,6 +83,7 @@
 #include <linux/irqflags.h>
 #include <linux/sched.h>
 #include <linux/sched/rt.h>
+#include <linux/debugfs.h>
 
 /* SPI interface instruction set */
 #define INSTRUCTION_WRITE	0x02
@@ -261,6 +262,13 @@ struct frame_queue {
     struct can_frame rx_frame[MAX_QUE];
 };
 #endif
+struct stats {
+    u64 irqs;
+    u64 irqs_b0;
+    u64 irqs_b1;
+    u64 rx_b0_req;
+    u64 rx_b1_req;
+};
 
 struct mcp251x_priv {
 	struct can_priv	   can;
@@ -297,6 +305,9 @@ struct mcp251x_priv {
     struct frame_queue rx_frames_q;
     struct work_struct q_work;
 #endif
+    // statistics
+    struct dentry *debugfs_dir;
+    struct stats stats;
 };
 
 #define MCP251X_IS(_model) \
@@ -1098,6 +1109,8 @@ static irqreturn_t mcp251x_can_ist(int irq, void *dev_id)
 //    local_irq_disable();
 #endif
 
+    priv->stats.irqs++;
+
     mutex_lock(&priv->mcp_lock);
     while (!priv->force_quit) {
 		enum can_state new_state;
@@ -1121,6 +1134,8 @@ static irqreturn_t mcp251x_can_ist(int irq, void *dev_id)
 
 		/* receive buffer 0 */
 		if (intf & CANINTF_RX0IF) {
+            priv->stats.irqs_b0++;
+            priv->stats.rx_b0_req++;
 #if MAX_QUE
             full +=
 #endif
@@ -1134,19 +1149,21 @@ static irqreturn_t mcp251x_can_ist(int irq, void *dev_id)
             //    clear_intf |= CANINTF_RX0IF;
 
 			// check if frame is rxed in buffer 1 while buffer 0 was hadling
-			if (!(intf & CANINTF_RX1IF)) {
-				u8 intf1, eflag1;
+			//if (!(intf & CANINTF_RX1IF)) {
+			//	u8 intf1, eflag1;
 
 				// read intf again to avoid a race condition */
-				mcp251x_read_2regs(spi, CANINTF, &intf1, &eflag1);
+			//	mcp251x_read_2regs(spi, CANINTF, &intf1, &eflag1);
 
-				intf |= intf1;
-				eflag |= eflag1;
-			}
+			//	intf |= intf1;
+			//	eflag |= eflag1;
+			//}
 		}
 
 		/* receive buffer 1 */
 		if (intf & CANINTF_RX1IF) {
+            priv->stats.irqs_b1++;
+            priv->stats.rx_b1_req++;
 #if MAX_QUE
 			full +=
 #endif
@@ -1312,6 +1329,7 @@ static int mcp251x_open(struct net_device *net)
     loss_frames.c = 0;
 #endif
 
+    memset(&priv->stats, 0, sizeof(priv->stats));
 //	ret = request_threaded_irq(spi->irq, NULL, mcp251x_can_ist,
 //				   flags | IRQF_ONESHOT, DEVICE_NAME, priv);
     ret = request_threaded_irq(priv->pdata->irq, 0, mcp251x_can_ist, flags, DEVICE_NAME, priv);
@@ -1482,6 +1500,48 @@ static ssize_t mcp251x_filter_show(struct device *dev, struct device_attribute *
                    priv->pdata->filters[4].fid.sid, priv->pdata->filters[4].fid.eid, priv->pdata->filters[4].exide,
                    priv->pdata->filters[5].fid.sid, priv->pdata->filters[5].fid.eid, priv->pdata->filters[5].exide);
 }
+
+#if defined(CONFIG_DEBUG_FS)
+static void mcp251x_debugfs_add(struct mcp251x_priv *priv)
+{
+	struct dentry *root, *regs, *stats;
+	char name[32];
+
+	/* create the net device name */
+	snprintf(name, sizeof(name), DEVICE_NAME "-%s", priv->net->name);
+
+    priv->debugfs_dir = debugfs_create_dir(name, 0);
+	root = priv->debugfs_dir;
+
+	regs = debugfs_create_dir("regs", root);
+	stats = debugfs_create_dir("stats", root);
+
+	debugfs_create_u64("rx_b0_req", 0444, stats, &priv->stats.rx_b0_req);
+    debugfs_create_u64("rx_b1_req", 0444, stats, &priv->stats.rx_b1_req);
+
+	debugfs_create_u64("irqs", 0444, stats, &priv->stats.irqs);
+	debugfs_create_u64("irqsb0", 0444, stats, &priv->stats.irqs_b0);
+    debugfs_create_u64("irqsb1", 0444, stats, &priv->stats.irqs_b1);
+
+	// dump the controller registers
+	//debugfs_create_devm_seqfile(&priv->spi->dev, "reg_dump", root, mcp251x_dump_regs);
+}
+
+static void mcp251x_debugfs_remove(struct mcp251x_priv *priv)
+{
+	debugfs_remove_recursive(priv->debugfs_dir);
+}
+
+#else
+static void mcp251x_debugfs_add(struct mcp25xxfd_priv *priv)
+{
+	return 0;
+}
+
+static void mcp251x_debugfs_remove(struct mcp25xxfd_priv *priv)
+{
+}
+#endif
 
 static int mcp251x_can_probe(struct spi_device *spi)
 {
@@ -1816,6 +1876,7 @@ static int mcp251x_can_probe(struct spi_device *spi)
     err = device_create_file(&priv->net->dev, &priv->pdata->attr_mask.attr);
     err = device_create_file(&priv->net->dev, &priv->pdata->attr_filter.attr);
 
+    mcp251x_debugfs_add(priv);
 	devm_can_led_init(net);
 
 	netdev_info(net, "MCP%x successfully initialized.\n", priv->model);
@@ -1847,6 +1908,8 @@ static int mcp251x_can_remove(struct spi_device *spi)
 {
 	struct mcp251x_priv *priv = spi_get_drvdata(spi);
 	struct net_device *net = priv->net;
+
+    mcp251x_debugfs_remove(priv);
 
 	unregister_candev(net);
 
